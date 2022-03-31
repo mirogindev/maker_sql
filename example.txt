@@ -1,0 +1,8 @@
+SELECT json_build_object(
+               'name', user_groups0_name  ,'id', user_groups0_id
+           ) FROM (
+                      SELECT
+                          user_groups0.id as user_groups0_id  ,user_groups0.name as user_groups0_name
+                      from   user_groups user_groups0
+                      Where user_groups0.id = '15bd54c0-ce72-41c6-93e3-36a1551bbc5a'  ORDER BY user_groups0.created_at desc
+                  ) as root
