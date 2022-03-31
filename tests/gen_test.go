@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"log"
 	"sqlgenerator/callbacks"
 	"sqlgenerator/mclause"
@@ -98,32 +99,23 @@ func Prepare() *gorm.DB {
 //}
 
 func TestManyToManyRelation(t *testing.T) {
-	testSQL := "SELECT json_build_object('id',id,'name',name) FROM (SELECT \"users\".\"id\",\"users\".\"created_at\",\"users\".\"updated_at\",\"users\".\"name\",\"users\".\"group_id\" FROM \"users\" LEFT JOIN \"user_tag\" \"user_tag\" ON \"users\".\"id\" = \"user_tag\".\"user_id\" LEFT JOIN \"tags\" \"Tags\" ON \"user_tag\".\"tag_id\" = \"Tags\".\"id\" WHERE \"Tags\".name = 'Tag1') as root"
+	testSQL := "SELECT json_build_object('id',users_id,'name',users_name) FROM (SELECT \"users\".\"name\" AS \"users_name\",\"users\".\"id\" AS \"users_id\" FROM \"users\" LEFT JOIN \"user_tag\" \"user_tag\" ON \"users\".\"id\" = \"user_tag\".\"user_id\" LEFT JOIN \"tags\" \"Tags\" ON \"user_tag\".\"tag_id\" = \"Tags\".\"id\" WHERE \"Tags\".name = 'Tag1') as root"
 	user := models.User{}
 	db := Prepare()
 	db.Callback().Query().Register("gorm:query", callbacks.Query)
 
-	subquery := db.Model(&user).Joins("Tags").Where("\"Tags\".name = 'Tag1'")
-	stm := db.Session(&gorm.Session{DryRun: true}).Table("(?) as root", subquery).Clauses(mclause.JsonBuild{
+	subQuery := db.Model(&user).Clauses(clause.Select{Columns: []clause.Column{
+		{Name: "users.name", Alias: "users_name"},
+		{Name: "users.id", Alias: "users_id"},
+	}}).Joins("Tags").Where("\"Tags\".name = 'Tag1'")
+	stm := db.Session(&gorm.Session{DryRun: true}).Table("(?) as root", subQuery).Clauses(mclause.JsonBuild{
 		Columns: []mclause.Column{
-			{Name: "id", Path: "id"},
-			{Name: "name", Path: "name"},
+			{Name: "id", Path: "users_id"},
+			{Name: "name", Path: "users_name"},
 		},
 	}).Find(&user).Statement
-	//subQuery1 := db.Model(&user).Joins("Group").Clauses(
-	//	clause.Select{Columns: []clause.Column{
-	//		{Name: "users.name", Alias: "users_name"},
-	//		{Name: "users.id", Alias: "users_id"},
-	//		{Name: "id", Alias: "group_id",Table: "Group"},
-	//		{Name: "name", Alias: "group_name"},
-	//	},
-	//	}).Where("")
-	//stm := db.Session(&gorm.Session{DryRun: true}).Table("(?) as root", subQuery1).Clauses(mclause.JsonBuild{Columns: []clause.Column{{Name: "id", Alias: "users_id"}, {Name: "name", Alias: "users_name"}}}).Find(&user).Statement
+
 	txt := stm.SQL.String()
 	assert.Equal(t, txt, testSQL)
 	log.Println(txt)
-}
-
-func cleanSelections(db *gorm.DB) {
-	log.Println("ddd")
 }
