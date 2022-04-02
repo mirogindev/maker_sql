@@ -18,21 +18,21 @@ import (
 //	}{
 //		{
 //			[]clause.Interface{mclause.JsonBuild{
-//				Columns: []clause.Column{{Name: "id", Alias: "users.id"}, {Name: "name", Alias: "users.name"}},
+//				Fields: []clause.Column{{Name: "id", Alias: "users.id"}, {Name: "name", Alias: "users.name"}},
 //			}, clause.From{}},
 //			"SELECT json_build_object('id',users.id,'name',users.name) FROM `users`", nil,
 //		},
 //		//{
 //		//	[]clause.Interface{mclause.JsonBuild{
-//		//		Columns: []clause.Column{clause.PrimaryColumn},
+//		//		Fields: []clause.Column{clause.PrimaryColumn},
 //		//	}, clause.From{}},
 //		//	"SELECT `users`.`id` FROM `users`", nil,
 //		//},
 //		//{
 //		//	[]clause.Interface{mclause.JsonBuild{
-//		//		Columns: []clause.Column{clause.PrimaryColumn},
+//		//		Fields: []clause.Column{clause.PrimaryColumn},
 //		//	}, mclause.JsonBuild{
-//		//		Columns: []clause.Column{{Name: "name"}},
+//		//		Fields: []clause.Column{{Name: "name"}},
 //		//	}, clause.From{}},
 //		//	"SELECT `name` FROM `users`", nil,
 //		//},

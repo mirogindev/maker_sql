@@ -5,7 +5,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"log"
 	"sqlgenerator/callbacks"
 	"sqlgenerator/mclause"
@@ -92,7 +91,7 @@ func Prepare() *gorm.DB {
 //	db := Prepare()
 //	db.Callback().Query().Register("gorm:query", callbacks.Query)
 //	subQuery1 := db.Model(&user).Joins("Group").Select("users.name,users.id,\"Group\".\"id\",\"Group\".\"name\"").Where("\"Group\".name = ?", "vasya")
-//	stm := db.Session(&gorm.Session{DryRun: true}).Table("(?) as root", subQuery1).Clauses(mclause.JsonBuild{Columns: []clause.Column{{Name: "id", Alias: "users.id"}, {Name: "name", Alias: "users.name"}}}).First(&user).Statement
+//	stm := db.Session(&gorm.Session{DryRun: true}).Table("(?) as root", subQuery1).Clauses(mclause.JsonBuild{Fields: []clause.Column{{Name: "id", Alias: "users.id"}, {Name: "name", Alias: "users.name"}}}).First(&user).Statement
 //	txt := stm.SQL.String()
 //	assert.Equal(t, txt, testSQL)
 //	log.Println(txt)
@@ -103,17 +102,44 @@ func TestManyToManyRelation(t *testing.T) {
 	user := models.User{}
 	db := Prepare()
 	db.Callback().Query().Register("gorm:query", callbacks.Query)
+	db = db.Session(&gorm.Session{DryRun: true})
 
-	subQuery := db.Model(&user).Clauses(clause.Select{Columns: []clause.Column{
-		{Name: "users.name", Alias: "users_name"},
-		{Name: "users.id", Alias: "users_id"},
-	}}).Joins("Tags").Where("\"Tags\".name = 'Tag1'")
-	stm := db.Session(&gorm.Session{DryRun: true}).Table("(?) as root", subQuery).Clauses(mclause.JsonBuild{
-		Columns: []mclause.Column{
-			{Name: "id", Path: "users_id"},
-			{Name: "name", Path: "users_name"},
-		},
-	}).Find(&user).Statement
+	tagsQuery := db.Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "id"},
+			{Name: "name"},
+		}})
+
+	stm := db.Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "id"},
+			{Name: "name"},
+			{Name: "tags", Query: tagsQuery, TargetType: &models.Tag{}},
+		}}).Joins("Tags").Where("\"Tags\".name = 'Tag1'").Find(&user).Statement
+
+	//
+	//subQueryL2 := db.Model(&models.Tag{}).Clauses(mclause.JsonQueryField{Fields: []mclause.Column{
+	//	{Name: "tags.name", Path: "tags1_name"},
+	//	{Name: "tags.id", Path: "tags1_id"},
+	//}})
+	//
+	//db = db.Session(&gorm.Session{DryRun: true})
+	//
+	//stmL2 := db.Table("(?) as root", subQueryL2).Clauses(mclause.JsonBuild{
+	//	JsonAgg: true,
+	//	Fields: []mclause.Column{
+	//		{Name: "id", Path: "tags1_id"},
+	//		{Name: "name", Path: "tags1_name"},
+	//	},
+	//})
+	//
+	//stm := db.Table("(?) as root", subQuery).Clauses(mclause.JsonBuild{
+	//	Fields: []mclause.Column{
+	//		{Name: "id", Path: "users0_id"},
+	//		{Name: "name", Path: "users0_name"},
+	//		{Name: "tags", Query: db.Table("(?) as root", stmL2).Find(models.Tag{})},
+	//	},
+	//}).Find(&user).Statement
 
 	txt := stm.SQL.String()
 	assert.Equal(t, txt, testSQL)
