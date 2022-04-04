@@ -8,8 +8,15 @@ type User struct {
 	UpdatedAt time.Time  `json:"updated_at" mapstructure:"updated_at"`
 	Name      *string    `json:"name" mapstructure:"name"`
 	Tags      []*Tag     `json:"tags" gorm:"many2many:user_tag"`
+	Items     []*Item    `json:"items" gorm:"foreignKey:UserId"`
 	GroupID   *int64     `json:"group_id" mapstructure:"group_id" graphql:"group_id"`
 	Group     *UserGroup `json:"group" mapstructure:"group" gorm:"foreignKey:GroupID"`
+}
+
+type Item struct {
+	ID     *int64  `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
+	Name   *string `json:"name"`
+	UserId *int64  `json:"user_id"`
 }
 
 type Tag struct {

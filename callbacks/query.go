@@ -26,6 +26,15 @@ func Query(db *gorm.DB) {
 }
 
 func BuildQuerySQL(db *gorm.DB) {
+	baseTable := clause.CurrentTable
+	baseTableAlias := baseTable
+	if db.Statement.TableExpr != nil {
+		spl := strings.Split(db.Statement.TableExpr.SQL, " ")
+		if len(spl) == 2 {
+			baseTableAlias = spl[1]
+		}
+
+	}
 	if db.Statement.Schema != nil {
 		for _, c := range db.Statement.Schema.QueryClauses {
 			db.Statement.AddClause(c)
@@ -115,7 +124,7 @@ func BuildQuerySQL(db *gorm.DB) {
 					})
 				} else if relation, ok := db.Statement.Schema.Relationships.Relations[join.Name]; ok {
 					if relation.Type == schema.Many2Many {
-						tableAliasName := relation.Name
+						targetTableAliasName := relation.Name
 						mmTableAliasName := relation.JoinTable.Table
 
 						mmExprs := make([]clause.Expression, 0)
@@ -123,19 +132,19 @@ func BuildQuerySQL(db *gorm.DB) {
 						for _, ref := range relation.References {
 							if ref.OwnPrimaryKey {
 								mmExprs = append(mmExprs, clause.Eq{
-									Column: clause.Column{Table: clause.CurrentTable, Name: ref.PrimaryKey.DBName},
+									Column: clause.Column{Table: baseTableAlias, Name: ref.PrimaryKey.DBName},
 									Value:  clause.Column{Table: mmTableAliasName, Name: ref.ForeignKey.DBName},
 								})
 							} else {
 								if ref.PrimaryValue == "" {
 									exprs = append(exprs, clause.Eq{
 										Column: clause.Column{Table: mmTableAliasName, Name: ref.ForeignKey.DBName},
-										Value:  clause.Column{Table: tableAliasName, Name: ref.PrimaryKey.DBName},
+										Value:  clause.Column{Table: targetTableAliasName, Name: ref.PrimaryKey.DBName},
 									})
 
 								} else {
 									exprs = append(exprs, clause.Eq{
-										Column: clause.Column{Table: tableAliasName, Name: ref.ForeignKey.DBName},
+										Column: clause.Column{Table: targetTableAliasName, Name: ref.ForeignKey.DBName},
 										Value:  ref.PrimaryValue,
 									})
 								}
@@ -143,13 +152,11 @@ func BuildQuerySQL(db *gorm.DB) {
 						}
 
 						joins = append(joins, clause.Join{
-							Type:  clause.LeftJoin,
 							Table: clause.Table{Name: relation.JoinTable.Table, Alias: mmTableAliasName},
 							ON:    clause.Where{Exprs: mmExprs},
 						})
 						joins = append(joins, clause.Join{
-							Type:  clause.LeftJoin,
-							Table: clause.Table{Name: relation.FieldSchema.Table, Alias: tableAliasName},
+							Table: clause.Table{Name: relation.FieldSchema.Table, Alias: targetTableAliasName},
 							ON:    clause.Where{Exprs: exprs},
 						})
 					} else {
@@ -159,13 +166,13 @@ func BuildQuerySQL(db *gorm.DB) {
 						for idx, ref := range relation.References {
 							if ref.OwnPrimaryKey {
 								exprs[idx] = clause.Eq{
-									Column: clause.Column{Table: clause.CurrentTable, Name: ref.PrimaryKey.DBName},
+									Column: clause.Column{Table: baseTableAlias, Name: ref.PrimaryKey.DBName},
 									Value:  clause.Column{Table: tableAliasName, Name: ref.ForeignKey.DBName},
 								}
 							} else {
 								if ref.PrimaryValue == "" {
 									exprs[idx] = clause.Eq{
-										Column: clause.Column{Table: clause.CurrentTable, Name: ref.ForeignKey.DBName},
+										Column: clause.Column{Table: baseTableAlias, Name: ref.ForeignKey.DBName},
 										Value:  clause.Column{Table: tableAliasName, Name: ref.PrimaryKey.DBName},
 									}
 								} else {
