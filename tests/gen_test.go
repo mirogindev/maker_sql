@@ -109,7 +109,7 @@ func Prepare() *gorm.DB {
 }
 
 func TestManyToManyRelation(t *testing.T) {
-	testSQL := "SELECT json_build_object(\n'id',users0_id,\n'name',users0_name,\n'tags',\n(SELECT json_agg(json_build_object(\n'name',tags1_name)) FROM (  SELECT \"tags1\".\"name\" AS \"tags1_name\" FROM tags tags1 JOIN \"user_tag\" \"user_tag1\" ON (tag_id = id AND user_id = users0_id) ) as root)\n) FROM (  SELECT \"users0\".\"id\" AS \"users0_id\",\"users0\".\"name\" AS \"users0_name\" FROM users users0 JOIN \"user_tag\" \"user_tag\" ON \"users0\".\"id\" = \"user_tag\".\"user_id\" JOIN \"tags\" \"Tags\" ON \"user_tag\".\"tag_id\" = \"Tags\".\"id\" WHERE \"Tags\".name = 'Tag3' ) as root"
+	testSQL := "SELECT json_build_object(\n'id',users0_id,\n'name',users0_name,\n'tags',\n(SELECT json_agg(json_build_object(\n'name',tags1_name)) FROM (  SELECT \"tags1\".\"name\" AS \"tags1_name\" FROM tags tags1 JOIN \"user_tag\" \"user_tag1\" ON (user_id = users0_id AND tag_id = id) ) as root)\n) FROM (  SELECT \"users0\".\"id\" AS \"users0_id\",\"users0\".\"name\" AS \"users0_name\" FROM users users0 JOIN \"user_tag\" \"user_tag\" ON \"users0\".\"id\" = \"user_tag\".\"user_id\" JOIN \"tags\" \"Tags\" ON \"user_tag\".\"tag_id\" = \"Tags\".\"id\" WHERE \"Tags\".name = 'Tag3' ) as root"
 	user := models.User{}
 	db := Prepare()
 	db.Callback().Query().Register("gorm:query", callbacks.Query)

@@ -84,6 +84,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 	if len(s.Fields) > 0 {
 		baseTable := gstm.Schema.Table
+		baseTableAlias := fmt.Sprintf("%s%v", baseTable, s.Level)
 
 		for idx, column := range s.Fields {
 			f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(column.Name)]
@@ -124,18 +125,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 					jc := clauses.Join{
 						ON: clauses.Where{
-							Exprs: []clauses.Expression{
-								clauses.AndConditions{
-									Exprs: []clauses.Expression{
-										clauses.NamedExpr{
-											SQL: "tag_id = id",
-										},
-										clauses.NamedExpr{
-											SQL: "user_id = users0_id",
-										},
-									},
-								},
-							},
+							Exprs: s.buildJoinCondition(relation.References, baseTableAlias),
 						},
 						Table: clauses.Table{
 							Name:  relation.JoinTable.Table,
@@ -155,6 +145,8 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					builder.WriteString(") as root")
 					builder.WriteString(")")
 				} else if relation.Type == schema.BelongsTo {
+					primaryKeyName := relation.References[0].PrimaryKey.DBName
+					foreignKeyName := relation.References[0].ForeignKey.DBName
 
 					selectExpression.Level = level
 
@@ -164,9 +156,9 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 					st := gstm.Clauses["SELECT"].Expression.(*Select)
 
-					if !st.ColumnNameExist("group_id") {
+					if !st.ColumnNameExist(foreignKeyName) {
 						st.AddColumn(clauses.Column{
-							Name: "group_id",
+							Name: foreignKeyName,
 						})
 					}
 
@@ -177,7 +169,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					).Clauses(clauses.Where{
 						Exprs: []clauses.Expression{
 							clauses.NamedExpr{
-								SQL: "id = users0_group_id",
+								SQL: fmt.Sprintf("%s = %s_%s", primaryKeyName, baseTableAlias, foreignKeyName),
 							},
 						},
 					}).Find(column.TargetType).Statement.SQL.String()
@@ -186,7 +178,8 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					builder.WriteString(") as root")
 					builder.WriteString(")")
 				} else if relation.Type == schema.HasMany {
-
+					primaryKeyName := relation.References[0].PrimaryKey.DBName
+					foreignKeyName := relation.References[0].ForeignKey.DBName
 					selectExpression.Level = level
 
 					jsonExpression.ParentType = gstm.Model
@@ -201,7 +194,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					).Clauses(clauses.Where{
 						Exprs: []clauses.Expression{
 							clauses.NamedExpr{
-								SQL: "user_id = users0_id",
+								SQL: fmt.Sprintf("%s = %s_%s", foreignKeyName, baseTableAlias, primaryKeyName),
 							},
 						},
 					}).Find(column.TargetType).Statement.SQL.String()
@@ -242,3 +235,37 @@ func (s JsonBuild) MergeClause(clause *clauses.Clause) {
 func (s JsonBuild) GenerateFieldJoins(builder *gorm.Statement) {
 
 }
+
+func (s JsonBuild) buildJoinCondition(references []*schema.Reference, baseTableAlias string) []clauses.Expression {
+	if len(references) > 1 {
+		andCond := clauses.AndConditions{}
+		//exprs := clauses.AndConditions{}
+		for _, r := range references {
+			var exp clauses.NamedExpr
+			if r.OwnPrimaryKey {
+				exp = clauses.NamedExpr{
+					SQL: fmt.Sprintf("%s = %s_%s", r.ForeignKey.DBName, baseTableAlias, r.PrimaryKey.DBName),
+				}
+			} else {
+				exp = clauses.NamedExpr{
+					SQL: fmt.Sprintf("%s = %s", r.ForeignKey.DBName, r.PrimaryKey.DBName),
+				}
+			}
+			andCond.Exprs = append(andCond.Exprs, exp)
+		}
+		return []clauses.Expression{andCond}
+	}
+	return nil
+}
+
+//		clauses.AndConditions{
+//		Exprs: clauses.AndConditions{
+//			clauses.NamedExpr{
+//				SQL: fmt.Sprintf("tag_id = id"),
+//			},
+//			clauses.NamedExpr{
+//				SQL: "user_id = users0_id",
+//			},
+//		},
+//	},
+//}
