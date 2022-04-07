@@ -172,7 +172,7 @@ func BuildQuerySQL(db *gorm.DB) {
 							if ref.OwnPrimaryKey {
 								exprs[idx] = clause.Eq{
 									Column: clause.Column{Table: getAlias(ref.PrimaryKey.Schema.Table, db), Name: ref.PrimaryKey.DBName},
-									Value:  clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, db), Name: ref.ForeignKey.DBName},
+									Value:  clause.Column{Table: getAlias(join.Name, db), Name: ref.ForeignKey.DBName},
 								}
 							} else {
 								if ref.PrimaryValue == "" {

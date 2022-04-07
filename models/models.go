@@ -13,6 +13,12 @@ type User struct {
 	Group     *UserGroup `json:"group" mapstructure:"group" gorm:"foreignKey:GroupID"`
 }
 
+type Status struct {
+	ID     *int64  `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
+	ItemID *int64  `json:"item_id"`
+	Name   *string `json:"name"`
+}
+
 type Item struct {
 	ID         *int64       `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
 	Name       *string      `json:"name"`
@@ -20,6 +26,7 @@ type Item struct {
 	GroupID    *int64       `json:"group_id" mapstructure:"group_id" graphql:"group_id"`
 	UserId     *int64       `json:"user_id"`
 	Group      *UserGroup   `json:"group" mapstructure:"group" gorm:"foreignKey:GroupID"`
+	Statuses   []*Status    `json:"statuses" mapstructure:"statuses" gorm:"foreignKey:ItemID"`
 }
 
 type InnerItem struct {

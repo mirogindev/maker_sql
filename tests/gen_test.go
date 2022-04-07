@@ -38,6 +38,11 @@ func Prepare() *gorm.DB {
 		panic(err)
 	}
 
+	err = db.AutoMigrate(models.Status{})
+	if err != nil {
+		panic(err)
+	}
+
 	err = db.AutoMigrate(models.User{})
 	if err != nil {
 		panic(err)
@@ -62,6 +67,11 @@ func Prepare() *gorm.DB {
 		panic(err)
 	}
 
+	status1 := "Status1"
+	status2 := "Status2"
+	status3 := "Status3"
+	status4 := "Status4"
+
 	uName1 := "User1"
 	uName2 := "User2"
 
@@ -82,6 +92,11 @@ func Prepare() *gorm.DB {
 	iName7 := "Item7"
 	iName8 := "Item8"
 
+	st1 := &models.Status{Name: &status1}
+	st2 := &models.Status{Name: &status2}
+	st3 := &models.Status{Name: &status3}
+	st4 := &models.Status{Name: &status4}
+
 	ug1 := &models.UserGroup{Name: &gName1}
 	ug2 := &models.UserGroup{Name: &gName2}
 	ug3 := &models.UserGroup{Name: &gName3}
@@ -96,14 +111,19 @@ func Prepare() *gorm.DB {
 	iItem7 := &models.InnerItem{Name: &iName7}
 	iItem8 := &models.InnerItem{Name: &iName8}
 
-	item1 := &models.Item{Name: &iName1, Group: ug3, InnerItems: []*models.InnerItem{iItem5, iItem6}}
-	item2 := &models.Item{Name: &iName2, Group: ug3, InnerItems: []*models.InnerItem{iItem6, iItem7}}
-	item3 := &models.Item{Name: &iName3, Group: ug4, InnerItems: []*models.InnerItem{iItem7, iItem8}}
-	item4 := &models.Item{Name: &iName4, Group: ug4, InnerItems: []*models.InnerItem{iItem8, iItem1}}
+	item1 := &models.Item{Name: &iName1, Group: ug3, Statuses: []*models.Status{st4}, InnerItems: []*models.InnerItem{iItem5, iItem6}}
+	item2 := &models.Item{Name: &iName2, Group: ug3, Statuses: []*models.Status{st3}, InnerItems: []*models.InnerItem{iItem6, iItem7}}
+	item3 := &models.Item{Name: &iName3, Group: ug4, Statuses: []*models.Status{st2}, InnerItems: []*models.InnerItem{iItem7, iItem8}}
+	item4 := &models.Item{Name: &iName4, Group: ug4, Statuses: []*models.Status{st1}, InnerItems: []*models.InnerItem{iItem8, iItem1}}
 
 	tag1 := &models.Tag{Name: &tName1, InnerItems: []*models.InnerItem{iItem1, iItem2}, Items: []*models.Item{item1, item2}}
 	tag2 := &models.Tag{Name: &tName2, InnerItems: []*models.InnerItem{iItem2, iItem3}, Items: []*models.Item{item2, item3}}
 	tag3 := &models.Tag{Name: &tName3, InnerItems: []*models.InnerItem{iItem3, iItem4}, Items: []*models.Item{item3, item4}}
+
+	db.Create(st1)
+	db.Create(st2)
+	db.Create(st3)
+	db.Create(st4)
 
 	db.Create(iItem1)
 	db.Create(iItem2)
@@ -234,7 +254,7 @@ func TestManyToManyRelationWithInnerManyToManyFieldFilter(t *testing.T) {
 	tagsQuery := db.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
-		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Group").Where(db.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or(db.Where("\"Items.InnerItems\".name = 'Item5'").Where("\"Items.Group\".name = 'Group3'")).Group("id").Limit(10)
+		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Statuses").Joins("Items.Group").Where(db.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or(db.Where("\"Items.InnerItems\".name = 'Item7'").Where("\"Items.Group\".name = 'Group3'").Where("\"Items.Statuses\".name = 'Status1'")).Group("id").Limit(10)
 	stm := db.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
