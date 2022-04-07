@@ -14,15 +14,25 @@ type User struct {
 }
 
 type Item struct {
-	ID     *int64  `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
-	Name   *string `json:"name"`
-	UserId *int64  `json:"user_id"`
+	ID         *int64       `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
+	Name       *string      `json:"name"`
+	InnerItems []*InnerItem `gorm:"many2many:item_inner_items"`
+	GroupID    *int64       `json:"group_id" mapstructure:"group_id" graphql:"group_id"`
+	UserId     *int64       `json:"user_id"`
+	Group      *UserGroup   `json:"group" mapstructure:"group" gorm:"foreignKey:GroupID"`
+}
+
+type InnerItem struct {
+	ID   *int64  `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
+	Name *string `json:"name"`
 }
 
 type Tag struct {
-	ID    *int64  `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
-	Name  *string `json:"name"`
-	Users []*User `json:"users"  gorm:"many2many:user_tag"`
+	ID         *int64       `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
+	Name       *string      `json:"name"`
+	Users      []*User      `json:"users"  gorm:"many2many:user_tag"`
+	Items      []*Item      `json:"items"  gorm:"many2many:tag_items"`
+	InnerItems []*InnerItem `gorm:"many2many:tag_inner_items"`
 }
 
 type UserGroup struct {

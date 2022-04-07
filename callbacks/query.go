@@ -1,11 +1,13 @@
 package callbacks
 
 import (
+	"fmt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
 	"log"
 	"reflect"
+	"sqlgenerator/mclause"
 	"strings"
 )
 
@@ -118,14 +120,17 @@ func BuildQuerySQL(db *gorm.DB) {
 			log.Println("----")
 
 			for _, join := range db.Statement.Joins {
+				splJoin := strings.Split(join.Name, ".")
+
 				if db.Statement.Schema == nil {
 					joins = append(joins, clause.Join{
 						Expression: clause.NamedExpr{SQL: join.Name, Vars: join.Conds},
 					})
-				} else if relation, ok := db.Statement.Schema.Relationships.Relations[join.Name]; ok {
+				} else if relation, ok := findRelation(db.Statement.Schema.Relationships.Relations, splJoin); ok {
+
 					if relation.Type == schema.Many2Many {
-						targetTableAliasName := relation.Name
-						mmTableAliasName := relation.JoinTable.Table
+						targetTableAliasName := getAlias(join.Name, db)
+						mmTableAliasName := getAlias(relation.JoinTable.Table, db)
 
 						mmExprs := make([]clause.Expression, 0)
 						exprs := make([]clause.Expression, 0)
@@ -160,24 +165,24 @@ func BuildQuerySQL(db *gorm.DB) {
 							ON:    clause.Where{Exprs: exprs},
 						})
 					} else {
-						tableAliasName := relation.Name
+						tableAliasName := getAlias(join.Name, db)
 
 						exprs := make([]clause.Expression, len(relation.References))
 						for idx, ref := range relation.References {
 							if ref.OwnPrimaryKey {
 								exprs[idx] = clause.Eq{
-									Column: clause.Column{Table: baseTableAlias, Name: ref.PrimaryKey.DBName},
-									Value:  clause.Column{Table: tableAliasName, Name: ref.ForeignKey.DBName},
+									Column: clause.Column{Table: getAlias(ref.PrimaryKey.Schema.Table, db), Name: ref.PrimaryKey.DBName},
+									Value:  clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, db), Name: ref.ForeignKey.DBName},
 								}
 							} else {
 								if ref.PrimaryValue == "" {
 									exprs[idx] = clause.Eq{
-										Column: clause.Column{Table: baseTableAlias, Name: ref.ForeignKey.DBName},
-										Value:  clause.Column{Table: tableAliasName, Name: ref.PrimaryKey.DBName},
+										Column: clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, db), Name: ref.ForeignKey.DBName},
+										Value:  clause.Column{Table: getAlias(join.Name, db), Name: ref.PrimaryKey.DBName},
 									}
 								} else {
 									exprs[idx] = clause.Eq{
-										Column: clause.Column{Table: tableAliasName, Name: ref.ForeignKey.DBName},
+										Column: clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, db), Name: ref.ForeignKey.DBName},
 										Value:  ref.PrimaryValue,
 									}
 								}
@@ -234,4 +239,27 @@ func BuildQuerySQL(db *gorm.DB) {
 
 		db.Statement.Build(db.Statement.BuildClauses...)
 	}
+}
+
+func findRelation(rels map[string]*schema.Relationship, arr []string) (*schema.Relationship, bool) {
+	for i, r := range arr {
+		if rel, ok := rels[r]; ok {
+			if len(arr) > 1 {
+				return findRelation(rel.FieldSchema.Relationships.Relations, arr[i+1:])
+			}
+			return rel, true
+		}
+	}
+	return nil, false
+}
+
+func getAlias(name string, db *gorm.DB) string {
+	selectClause := db.Statement.Clauses["SELECT"]
+	if selectClause.BeforeExpression != nil {
+		if v, ok := selectClause.BeforeExpression.(*mclause.JsonBuild); ok {
+			return fmt.Sprintf("\"%s%v\"", strings.Title(name), v.Level)
+		}
+	}
+
+	return name
 }

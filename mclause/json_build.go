@@ -6,7 +6,9 @@ import (
 	clauses "gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
 	"log"
+	"regexp"
 	"sqlgenerator"
+	"strings"
 )
 
 type Field struct {
@@ -30,9 +32,10 @@ type JsonBuild struct {
 func (s JsonBuild) ModifyStatement(stmt *gorm.Statement) {
 
 	SELECT := "SELECT"
-	FROM := "FROM"
+	//	FROM := "FROM"
 	selectClause := stmt.Clauses[SELECT]
-	fromClause := stmt.Clauses[FROM]
+
+	//fromClause := stmt.Clauses[FROM]
 
 	if selectClause.BeforeExpression == nil {
 		selectClause.BeforeExpression = &s
@@ -50,7 +53,7 @@ func (s JsonBuild) ModifyStatement(stmt *gorm.Statement) {
 
 	selectClause.Expression = sc
 	stmt.Clauses[SELECT] = selectClause
-	stmt.Clauses[FROM] = fromClause
+
 }
 
 func (s JsonBuild) Build(builder clauses.Builder) {
@@ -81,10 +84,11 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 	} else {
 		builder.WriteString("SELECT json_build_object(")
 	}
+	baseTable := gstm.Schema.Table
+	baseTableAlias := fmt.Sprintf("%s%v", strings.Title(baseTable), s.Level)
 
+	preprocessQuery(gstm, baseTableAlias, s.Level)
 	if len(s.Fields) > 0 {
-		baseTable := gstm.Schema.Table
-		baseTableAlias := fmt.Sprintf("%s%v", baseTable, s.Level)
 
 		for idx, column := range s.Fields {
 			f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(column.Name)]
@@ -129,13 +133,13 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 						},
 						Table: clauses.Table{
 							Name:  relation.JoinTable.Table,
-							Alias: fmt.Sprintf("%s%v", relation.JoinTable.Table, level),
+							Alias: fmt.Sprintf("%s%v", strings.Title(relation.JoinTable.Table), level),
 						},
 					}
 
 					sql := query.Table(
-						fmt.Sprintf("%s %s", relation.FieldSchema.Table,
-							fmt.Sprintf("%s%v", relation.FieldSchema.Table, level),
+						fmt.Sprintf("%s \"%s\"", relation.FieldSchema.Table,
+							fmt.Sprintf("%s%v", relation.Name, level),
 						),
 					).Clauses(clauses.From{
 						Joins: []clauses.Join{jc},
@@ -224,6 +228,84 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 }
 
+func preprocessQuery(st *gorm.Statement, tableAlias string, level int) {
+	WhereName := "WHERE"
+	GroupByName := "GROUP BY"
+	OrderByName := "ORDER BY"
+
+	cl := st.Clauses
+	whereClause := cl[WhereName]
+	groupBy := cl[GroupByName]
+	orderBy := cl[OrderByName]
+	log.Println(groupBy)
+	jExpr := whereClause.Expression
+	gExpr := groupBy.Expression
+	oExpr := orderBy.Expression
+	if wh, ok := jExpr.(clauses.Where); ok {
+		wh.Exprs = preprocessWhereClause(wh.Exprs, level)
+		whereClause.Expression = wh
+		cl[WhereName] = whereClause
+	}
+
+	if gb, ok := gExpr.(clauses.GroupBy); ok {
+		gb.Columns = preprocessGroupBYClause(gb.Columns, tableAlias, level)
+		groupBy.Expression = gb
+		cl[GroupByName] = groupBy
+	}
+
+	if gb, ok := oExpr.(clauses.OrderBy); ok {
+		gb.Columns = preprocessOrderBYClause(gb.Columns, tableAlias, level)
+		orderBy.Expression = gb
+		cl[OrderByName] = orderBy
+	}
+}
+
+func preprocessOrderBYClause(cols []clauses.OrderByColumn, tableAlias string, level int) []clauses.OrderByColumn {
+	tableAlias = fmt.Sprintf("\"%s\"", tableAlias)
+	for i, v := range cols {
+		spl := strings.Split(v.Column.Name, " ")
+		v.Column.Name = replaceColumnNamesWIthLevel(spl[0], tableAlias, level)
+		if len(spl) > 1 {
+			v.Column.Name = fmt.Sprintf("%s %s", v.Column.Name, spl[1])
+		}
+
+		cols[i] = v
+	}
+
+	return cols
+}
+
+func preprocessGroupBYClause(cols []clauses.Column, tableAlias string, level int) []clauses.Column {
+	for i, v := range cols {
+		v.Name = replaceColumnNamesWIthLevel(v.Name, tableAlias, level)
+		cols[i] = v
+	}
+
+	return cols
+}
+
+func preprocessWhereClause(exprs []clauses.Expression, level int) []clauses.Expression {
+	for i, v := range exprs {
+		if ce, ok := v.(clauses.Expr); ok {
+			ce.SQL = replaceTableNamesWIthLevel(ce.SQL, level)
+			exprs[i] = ce
+		} else if ce, ok := v.(clauses.NamedExpr); ok {
+			ce.SQL = replaceTableNamesWIthLevel(ce.SQL, level)
+			exprs[i] = ce
+		} else if ce, ok := v.(clauses.OrConditions); ok {
+			ce.Exprs = preprocessWhereClause(ce.Exprs, level)
+			exprs[i] = ce
+		} else if ce, ok := v.(clauses.AndConditions); ok {
+			ce.Exprs = preprocessWhereClause(ce.Exprs, level)
+			exprs[i] = ce
+		} else {
+			log.Println("Invalid type %T", v)
+		}
+
+	}
+	return exprs
+}
+
 func (s JsonBuild) MergeClause(clause *clauses.Clause) {
 	if s.Expression != nil {
 		clause.Expression = s.Expression
@@ -239,7 +321,6 @@ func (s JsonBuild) GenerateFieldJoins(builder *gorm.Statement) {
 func (s JsonBuild) buildJoinCondition(references []*schema.Reference, baseTableAlias string) []clauses.Expression {
 	if len(references) > 1 {
 		andCond := clauses.AndConditions{}
-		//exprs := clauses.AndConditions{}
 		for _, r := range references {
 			var exp clauses.NamedExpr
 			if r.OwnPrimaryKey {
@@ -258,14 +339,19 @@ func (s JsonBuild) buildJoinCondition(references []*schema.Reference, baseTableA
 	return nil
 }
 
-//		clauses.AndConditions{
-//		Exprs: clauses.AndConditions{
-//			clauses.NamedExpr{
-//				SQL: fmt.Sprintf("tag_id = id"),
-//			},
-//			clauses.NamedExpr{
-//				SQL: "user_id = users0_id",
-//			},
-//		},
-//	},
-//}
+func replaceTableNamesWIthLevel(_sql string, level int) string {
+	var re = regexp.MustCompile(`"(.*?)"`)
+	s := re.ReplaceAllString(_sql, strings.ToLower(fmt.Sprintf(`"${1}%v"`, level)))
+	return s
+}
+
+func replaceColumnNamesWIthLevel(_sql string, tableAlias string, level int) string {
+	spl := strings.Split(_sql, ".")
+	if len(spl) == 1 {
+		return fmt.Sprintf("%s.%s", tableAlias, _sql)
+	}
+
+	var re = regexp.MustCompile(`"(.*?)"`)
+	s := re.ReplaceAllString(_sql, strings.ToLower(fmt.Sprintf(`"${1}%v"`, level)))
+	return s
+}
