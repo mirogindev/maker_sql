@@ -275,3 +275,19 @@ func TestManyToManyRelationWithInnerManyToManyFieldFilter(t *testing.T) {
 	assert.Len(t, users[0].Tags, 2)
 	assert.Len(t, users[1].Tags, 1)
 }
+
+func TestSumAggregation(t *testing.T) {
+	var users []*models.UserAggregateSum
+	Prepare()
+
+	err := DB.Debug().Table("users \"Users0\"").Model(&models.User{}).Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "id"},
+			{Name: "Sum", Path: "Sum(id)"},
+		}}).Group("id").Find(&users).Error
+
+	if err != nil {
+		panic(err)
+	}
+
+}

@@ -25,6 +25,33 @@ func (j User) Value() (driver.Value, error) {
 	return res, err
 }
 
+func (j *UserAggregateSum) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New(fmt.Sprint("Failed to unmarshal JSON value:", value))
+	}
+	var result UserAggregateSum
+
+	err := json.Unmarshal(bytes, &result)
+	*j = result
+	return err
+}
+
+func (j UserAggregateSum) Value() (driver.Value, error) {
+	res, err := json.Marshal(j)
+	return res, err
+}
+
+type UserAggregateSum struct {
+	Amount *int64 `mapstructure:"amount" graphql:"amount" table:"decimals" json:"amount"`
+}
+
+type BudgetMonthReservedAggregate struct {
+	ID   *int64            `mapstructure:"id" graphql:"id" json:"id"`
+	Name *string           `json:"name" mapstructure:"name"`
+	Sum  *UserAggregateSum `json:"sum" mapstructure:"sum" graphql:"sum"`
+}
+
 type User struct {
 	ID        *int64     `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
 	CreatedAt time.Time  `json:"created_at" mapstructure:"created_at"`
