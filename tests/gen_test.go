@@ -5,7 +5,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"log"
 	"sqlgenerator/callbacks"
 	"sqlgenerator/mclause"
 	"sqlgenerator/models"
@@ -31,38 +30,47 @@ func Truncate(db *gorm.DB) error {
 	return tx.Commit().Error
 }
 
-func Prepare() *gorm.DB {
+var DB *gorm.DB
+
+func init() {
 	dsn := "host=localhost user=postgres password=postgres dbname=gen_test port=5432 sslmode=disable TimeZone=Europe/Moscow"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	var err error
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.AutoMigrate(models.Status{})
+	err = DB.AutoMigrate(models.Status{})
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.AutoMigrate(models.User{})
+	err = DB.AutoMigrate(models.User{})
 	if err != nil {
 		panic(err)
 	}
-	err = db.AutoMigrate(models.UserGroup{})
-	if err != nil {
-		panic(err)
-	}
-
-	err = db.AutoMigrate(models.Tag{})
+	err = DB.AutoMigrate(models.UserGroup{})
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.AutoMigrate(models.Item{})
+	err = DB.AutoMigrate(models.Tag{})
 	if err != nil {
 		panic(err)
 	}
 
-	err = Truncate(db)
+	err = DB.AutoMigrate(models.Item{})
+	if err != nil {
+		panic(err)
+	}
+
+}
+
+func Prepare() {
+
+	err := Truncate(DB)
+	DB.Callback().Query().Register("gorm:query", callbacks.Query)
 	if err != nil {
 		panic(err)
 	}
@@ -120,149 +128,150 @@ func Prepare() *gorm.DB {
 	tag2 := &models.Tag{Name: &tName2, InnerItems: []*models.InnerItem{iItem2, iItem3}, Items: []*models.Item{item2, item3}}
 	tag3 := &models.Tag{Name: &tName3, InnerItems: []*models.InnerItem{iItem3, iItem4}, Items: []*models.Item{item3, item4}}
 
-	db.Create(st1)
-	db.Create(st2)
-	db.Create(st3)
-	db.Create(st4)
+	DB.Create(st1)
+	DB.Create(st2)
+	DB.Create(st3)
+	DB.Create(st4)
 
-	db.Create(iItem1)
-	db.Create(iItem2)
-	db.Create(iItem3)
-	db.Create(iItem4)
+	DB.Create(iItem1)
+	DB.Create(iItem2)
+	DB.Create(iItem3)
+	DB.Create(iItem4)
 
-	db.Create(item1)
-	db.Create(item2)
-	db.Create(item3)
-	db.Create(item4)
+	DB.Create(item1)
+	DB.Create(item2)
+	DB.Create(item3)
+	DB.Create(item4)
 
-	db.Create(tag1)
-	db.Create(tag2)
-	db.Create(tag3)
+	DB.Create(tag1)
+	DB.Create(tag2)
+	DB.Create(tag3)
 
-	db.Create(ug1)
-	db.Create(ug2)
+	DB.Create(ug1)
+	DB.Create(ug2)
 
-	db.Create(&models.User{Name: &uName1, GroupID: ug1.ID, Tags: []*models.Tag{tag1, tag2}, Items: []*models.Item{item1, item2}})
-	db.Create(&models.User{Name: &uName2, GroupID: ug2.ID, Tags: []*models.Tag{tag1, tag3}, Items: []*models.Item{item3, item4}})
-
-	return db
+	DB.Create(&models.User{Name: &uName1, GroupID: ug1.ID, Tags: []*models.Tag{tag1, tag2}, Items: []*models.Item{item1, item2}})
+	DB.Create(&models.User{Name: &uName2, GroupID: ug2.ID, Tags: []*models.Tag{tag1, tag3}, Items: []*models.Item{item3, item4}})
 
 }
 
 func TestManyToManyRelation(t *testing.T) {
-	testSQL := "SELECT json_build_object(\n'id',users0_id,\n'name',users0_name,\n'tags',\n(SELECT json_agg(json_build_object(\n'name',tags1_name)) FROM (  SELECT \"tags1\".\"name\" AS \"tags1_name\" FROM tags tags1 JOIN \"user_tag\" \"user_tag1\" ON (user_id = users0_id AND tag_id = id) ) as root)\n) FROM (  SELECT \"users0\".\"id\" AS \"users0_id\",\"users0\".\"name\" AS \"users0_name\" FROM users users0 JOIN \"user_tag\" \"user_tag0\" ON \"users0\".\"id\" = \"user_tag0\".\"user_id\" JOIN \"tags\" \"Tags0\" ON \"user_tag0\".\"tag_id\" = \"Tags0\".\"id\" WHERE \"Tags0\".name = 'Tag3' ) as root"
-	user := models.User{}
-	db := Prepare()
-	db.Callback().Query().Register("gorm:query", callbacks.Query)
-	db = db.Session(&gorm.Session{DryRun: true})
+	var users []*models.User
+	Prepare()
 
-	tagsQuery := db.Clauses(mclause.JsonBuild{
+	tagsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}})
 
-	stm := db.Table("users users0").Clauses(mclause.JsonBuild{
+	err := DB.Debug().Table("users \"Users0\"").Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
 			{Name: "tags", Query: tagsQuery, TargetType: &models.Tag{}},
-		}}).Joins("Tags").Where("\"Tags\".name = 'Tag3'").Find(&user).Statement
-
-	txt := stm.SQL.String()
-	assert.Equal(t, txt, testSQL)
-	log.Println(txt)
+		}}).Joins("Tags").Where("\"Tags\".name = 'Tag3'").Find(&users).Error
+	if err != nil {
+		panic(err)
+	}
+	assert.NotEmpty(t, users)
+	assert.Len(t, users, 1)
+	assert.Len(t, users[0].Tags, 2)
 }
 
 func TestManyToOneRelation(t *testing.T) {
-	testSQL := "SELECT json_build_object(\n'id',users0_id,\n'name',users0_name,\n'group',\n(SELECT json_build_object(\n'name',user_groups1_name) FROM (  SELECT \"user_groups1\".\"name\" AS \"user_groups1_name\" FROM user_groups user_groups1 WHERE id = users0_group_id ) as root)\n) FROM (  SELECT \"users0\".\"id\" AS \"users0_id\",\"users0\".\"name\" AS \"users0_name\",\"users0\".\"group_id\" AS \"users0_group_id\" FROM users users0 LEFT JOIN \"user_groups\" \"Group0\" ON \"users0\".\"group_id\" = \"Group0\".\"id\" WHERE \"Group0\".name = 'Group1' ) as root"
-	user := models.User{}
-	db := Prepare()
-	db.Callback().Query().Register("gorm:query", callbacks.Query)
-	db = db.Session(&gorm.Session{DryRun: true})
+	var users []*models.User
+	Prepare()
 
-	userGroupQuery := db.Clauses(mclause.JsonBuild{
+	userGroupQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}})
 
-	stm := db.Table("users users0").Clauses(mclause.JsonBuild{
+	err := DB.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
 			{Name: "group", Query: userGroupQuery, TargetType: &models.UserGroup{}},
-		}}).Joins("Group").Where("\"Group\".name = 'Group1'").Find(&user).Statement
+		}}).Joins("Group").Where("\"Group\".name = 'Group1'").Find(&users).Error
 
-	txt := stm.SQL.String()
-	assert.Equal(t, txt, testSQL)
-	log.Println(txt)
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 1)
+	assert.NotEmpty(t, users[0].Group)
 }
 
 func TestOneToManyRelation(t *testing.T) {
-	testSQL := "SELECT json_build_object(\n'id',users0_id,\n'name',users0_name,\n'items',\n(SELECT json_agg(json_build_object(\n'name',items1_name)) FROM (  SELECT \"items1\".\"name\" AS \"items1_name\" FROM items items1 WHERE user_id = users0_id ) as root)\n) FROM (  SELECT \"users0\".\"id\" AS \"users0_id\",\"users0\".\"name\" AS \"users0_name\" FROM users users0 LEFT JOIN \"items\" \"Items0\" ON \"users0\".\"id\" = \"Items0\".\"user_id\" WHERE \"Items0\".name = 'Item2' ) as root"
-	user := models.User{}
-	db := Prepare()
-	db.Callback().Query().Register("gorm:query", callbacks.Query)
-	db = db.Session(&gorm.Session{DryRun: true})
-
-	itemsQuery := db.Clauses(mclause.JsonBuild{
+	var users []*models.User
+	Prepare()
+	itemsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}})
 
-	stm := db.Table("users users0").Clauses(mclause.JsonBuild{
+	err := DB.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
 			{Name: "items", Query: itemsQuery, TargetType: &models.Item{}},
-		}}).Joins("Items").Where("\"Items\".name = 'Item2'").Find(&user).Statement
+		}}).Joins("Items").Where("\"Items\".name = 'Item2'").Find(&users).Error
 
-	txt := stm.SQL.String()
-	assert.Equal(t, txt, testSQL)
-	log.Println(txt)
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 1)
+	assert.Len(t, users[0].Items, 2)
+
 }
 
 func TestManyToManyRelationWithManyToManyFieldFilter(t *testing.T) {
-	testSQL := "SELECT json_build_object(\n'id',users0_id,\n'name',users0_name,\n'tags',\n(SELECT json_agg(json_build_object(\n'name',tags1_name)) FROM (  SELECT \"tags1\".\"name\" AS \"tags1_name\" FROM tags tags1 JOIN \"user_tag\" \"user_tag1\" ON (user_id = users0_id AND tag_id = id) JOIN \"tag_items\" \"tag_items1\" ON \"tags1\".\"id\" = \"tag_items1\".\"tag_id\" JOIN \"items\" \"Items1\" ON \"tag_items1\".\"item_id\" = \"Items1\".\"id\" WHERE \"Items1\".name = 'Item1' ) as root)\n) FROM (  SELECT \"users0\".\"id\" AS \"users0_id\",\"users0\".\"name\" AS \"users0_name\" FROM users users0 ) as root"
-	user := models.User{}
-	db := Prepare()
-	db.Callback().Query().Register("gorm:query", callbacks.Query)
-	db = db.Session(&gorm.Session{DryRun: true})
+	var users []*models.User
+	Prepare()
 
-	tagsQuery := db.Clauses(mclause.JsonBuild{
+	tagsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
-		}}).Joins("Items").Joins("InnerItems").Where(db.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or("\"InnerItems\".name = 'Item1'").Group("id").Order("name desc")
-	stm := db.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
+		}}).Joins("Items").Joins("InnerItems").Where(DB.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or("\"InnerItems\".name = 'Item1'").Group("id").Order("name desc")
+	err := DB.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
 			{Name: "tags", Query: tagsQuery, TargetType: &models.Tag{}},
-		}}).Find(&user).Statement
+		}}).Find(&users).Error
 
-	txt := stm.SQL.String()
-	assert.Equal(t, txt, testSQL)
-	log.Println(txt)
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 2)
+	assert.Len(t, users[0].Tags, 2)
+	assert.Len(t, users[1].Tags, 1)
+
 }
 
 func TestManyToManyRelationWithInnerManyToManyFieldFilter(t *testing.T) {
-	testSQL := "SELECT json_build_object(\n'id',users0_id,\n'name',users0_name,\n'tags',\n(SELECT json_agg(json_build_object(\n'name',tags1_name)) FROM (  SELECT \"tags1\".\"name\" AS \"tags1_name\" FROM tags tags1 JOIN \"user_tag\" \"user_tag1\" ON (user_id = users0_id AND tag_id = id) JOIN \"tag_items\" \"tag_items1\" ON \"tags1\".\"id\" = \"tag_items1\".\"tag_id\" JOIN \"items\" \"Items1\" ON \"tag_items1\".\"item_id\" = \"Items1\".\"id\" WHERE \"Items1\".name = 'Item1' ) as root)\n) FROM (  SELECT \"users0\".\"id\" AS \"users0_id\",\"users0\".\"name\" AS \"users0_name\" FROM users users0 ) as root"
-	user := models.User{}
-	db := Prepare()
-	db.Callback().Query().Register("gorm:query", callbacks.Query)
-	db = db.Session(&gorm.Session{DryRun: true})
+	var users []*models.User
+	Prepare()
 
-	tagsQuery := db.Clauses(mclause.JsonBuild{
+	tagsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
-		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Statuses").Joins("Items.Group").Where(db.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or(db.Where("\"Items.InnerItems\".name = 'Item7'").Where("\"Items.Group\".name = 'Group3'").Where("\"Items.Statuses\".name = 'Status1'")).Group("id").Limit(10)
-	stm := db.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
+		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Statuses").Joins("Items.Group").Where(DB.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or(db.Where("\"Items.InnerItems\".name = 'Item7'").Where("\"Items.Group\".name = 'Group3'").Where("\"Items.Statuses\".name = 'Status1'")).Group("id").Limit(10)
+
+	err := DB.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
 			{Name: "tags", Query: tagsQuery, TargetType: &models.Tag{}},
-		}}).Find(&user).Statement
+		}}).Find(&users).Error
 
-	txt := stm.SQL.String()
-	assert.Equal(t, txt, testSQL)
-	log.Println(txt)
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 2)
+	assert.Len(t, users[0].Tags, 2)
+	assert.Len(t, users[1].Tags, 1)
 }

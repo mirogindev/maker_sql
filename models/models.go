@@ -1,6 +1,29 @@
 package models
 
-import "time"
+import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+)
+
+func (j *User) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New(fmt.Sprint("Failed to unmarshal JSON value:", value))
+	}
+	var result User
+
+	err := json.Unmarshal(bytes, &result)
+	*j = result
+	return err
+}
+
+func (j User) Value() (driver.Value, error) {
+	res, err := json.Marshal(j)
+	return res, err
+}
 
 type User struct {
 	ID        *int64     `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`

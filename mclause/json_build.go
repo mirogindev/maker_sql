@@ -168,7 +168,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 					sql := query.Table(
 						fmt.Sprintf("%s %s", relation.FieldSchema.Table,
-							fmt.Sprintf("%s%v", relation.FieldSchema.Table, level),
+							fmt.Sprintf("\"%s%v\"", strings.Title(relation.FieldSchema.Table), level),
 						),
 					).Clauses(clauses.Where{
 						Exprs: []clauses.Expression{
@@ -193,7 +193,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 					sql := query.Table(
 						fmt.Sprintf("%s %s", relation.FieldSchema.Table,
-							fmt.Sprintf("%s%v", relation.FieldSchema.Table, level),
+							fmt.Sprintf("\"%s%v\"", strings.Title(relation.FieldSchema.Table), level),
 						),
 					).Clauses(clauses.Where{
 						Exprs: []clauses.Expression{
@@ -237,7 +237,6 @@ func preprocessQuery(st *gorm.Statement, tableAlias string, level int) {
 	whereClause := cl[WhereName]
 	groupBy := cl[GroupByName]
 	orderBy := cl[OrderByName]
-	log.Println(groupBy)
 	jExpr := whereClause.Expression
 	gExpr := groupBy.Expression
 	oExpr := orderBy.Expression
