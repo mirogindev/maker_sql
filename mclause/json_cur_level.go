@@ -4,10 +4,9 @@ import (
 	clauses "gorm.io/gorm/clause"
 )
 
-type JsonCurrentLevel struct {
-	Level int
+type GroupByHelper struct {
 }
 
-func (s JsonCurrentLevel) Build(builder clauses.Builder) {
-
+func (s GroupByHelper) Build(builder clauses.Builder) {
+	builder.WriteString("GROUP BY ")
 }

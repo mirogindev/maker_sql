@@ -25,42 +25,53 @@ func (j User) Value() (driver.Value, error) {
 	return res, err
 }
 
-func (j *UserAggregateSum) Scan(value interface{}) error {
+func (j *UserAggregate) Scan(value interface{}) error {
 	bytes, ok := value.([]byte)
 	if !ok {
 		return errors.New(fmt.Sprint("Failed to unmarshal JSON value:", value))
 	}
-	var result UserAggregateSum
+	var result UserAggregate
 
 	err := json.Unmarshal(bytes, &result)
 	*j = result
 	return err
 }
 
-func (j UserAggregateSum) Value() (driver.Value, error) {
+func (j UserAggregate) Value() (driver.Value, error) {
 	res, err := json.Marshal(j)
 	return res, err
 }
 
-type UserAggregateSum struct {
-	Amount *int64 `mapstructure:"amount" graphql:"amount" table:"decimals" json:"amount"`
+type UserAggregate struct {
+	ID  *int64            `json:"id"`
+	Sum *UserAggregateSum `json:"sum"`
 }
 
-type BudgetMonthReservedAggregate struct {
-	ID   *int64            `mapstructure:"id" graphql:"id" json:"id"`
-	Name *string           `json:"name" mapstructure:"name"`
-	Sum  *UserAggregateSum `json:"sum" mapstructure:"sum" graphql:"sum"`
+type UserAggregateSum struct {
+	AggrVal *int `json:"aggr_val"`
 }
+
+type TagAggregateSum struct {
+	AggrVal *int `json:"aggr_val"`
+}
+
+//type BudgetMonthReservedAggregate struct {
+//	ID   *int64            `mapstructure:"id" graphql:"id" json:"id"`
+//	Name *string           `json:"name" mapstructure:"name"`
+//	Sum  *UserAggregateSum `json:"sum" mapstructure:"sum" graphql:"sum"`
+//}
 
 type User struct {
-	ID        *int64     `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
-	CreatedAt time.Time  `json:"created_at" mapstructure:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at" mapstructure:"updated_at"`
-	Name      *string    `json:"name" mapstructure:"name"`
-	Tags      []*Tag     `json:"tags" gorm:"many2many:user_tag"`
-	Items     []*Item    `json:"items" gorm:"foreignKey:UserId"`
-	GroupID   *int64     `json:"group_id" mapstructure:"group_id" graphql:"group_id"`
-	Group     *UserGroup `json:"group" mapstructure:"group" gorm:"foreignKey:GroupID"`
+	ID            *int64          `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
+	CreatedAt     time.Time       `json:"created_at" mapstructure:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at" mapstructure:"updated_at"`
+	Name          *string         `json:"name" mapstructure:"name"`
+	Tags          []*Tag          `json:"tags" gorm:"many2many:user_tag"`
+	TagsAggregate []*TagAggregate `json:"tags_aggregate" gorm:"-" sql_gen:"Tags"`
+	Items         []*Item         `json:"items" gorm:"foreignKey:UserId"`
+	AggrVal       int             `json:"aggr_val"`
+	GroupID       *int64          `json:"group_id" mapstructure:"group_id" graphql:"group_id"`
+	Group         *UserGroup      `json:"group" mapstructure:"group" gorm:"foreignKey:GroupID"`
 }
 
 type Status struct {
@@ -87,9 +98,17 @@ type InnerItem struct {
 type Tag struct {
 	ID         *int64       `json:"id" mapstructure:"id" gorm:"primarykey" graphql:"id"`
 	Name       *string      `json:"name"`
+	AggrName   *string      `json:"aggr_name"`
+	AggrVal    *int         `json:"aggr_val"`
 	Users      []*User      `json:"users"  gorm:"many2many:user_tag"`
 	Items      []*Item      `json:"items"  gorm:"many2many:tag_items"`
 	InnerItems []*InnerItem `gorm:"many2many:tag_inner_items"`
+}
+
+type TagAggregate struct {
+	ID       *int64           `json:"id"`
+	AggrName *string          `json:"aggr_name"`
+	Sum      *TagAggregateSum `json:"sum"`
 }
 
 type UserGroup struct {

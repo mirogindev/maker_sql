@@ -7,17 +7,26 @@ import (
 	"strings"
 )
 
+type Column struct {
+	Name     string
+	Alias    string
+	Function string
+}
+
 type Select struct {
 	Level      int
 	Distinct   bool
-	Columns    []clause.Column
-	ColumnsMap map[string]clause.Column
+	Columns    []Column
+	ColumnsMap map[string]Column
 	Expression clause.Expression
 }
 
-func (s *Select) AddColumn(col clause.Column) {
+func (s *Select) AddColumn(col Column) {
 	if s.ColumnsMap == nil {
-		s.ColumnsMap = make(map[string]clause.Column)
+		s.ColumnsMap = make(map[string]Column)
+	}
+	if _, ok := s.ColumnsMap[col.Name]; ok {
+		return
 	}
 	s.ColumnsMap[col.Name] = col
 	s.Columns = append(s.Columns, col)
@@ -52,15 +61,31 @@ func (s Select) Build(builder clause.Builder) {
 
 		for idx, column := range s.Columns {
 			f := gstm.Schema.FieldsByDBName[column.Name]
-			alias := fmt.Sprintf("%s%v_%s", baseTable, s.Level, f.DBName)
 
-			column.Alias = alias
-			column.Table = fmt.Sprintf("\"%s\"", strings.Title(baseTableWithLevel))
+			alias := column.Alias
+			if alias == "" {
+				alias = fmt.Sprintf("%s%v_%s", baseTable, s.Level, f.DBName)
+			}
+
+			gc := clause.Column{}
+			gc.Table = fmt.Sprintf("\"%s\"", strings.Title(baseTableWithLevel))
+
+			if column.Function == "" {
+				gc.Alias = alias
+			}
+			gc.Name = column.Name
 
 			if idx > 0 {
 				builder.WriteByte(',')
 			}
-			builder.WriteQuoted(column)
+
+			if column.Function != "" {
+				builder.WriteString(fmt.Sprintf(" %s(", column.Function))
+				builder.WriteQuoted(gc)
+				builder.WriteString(fmt.Sprintf(") AS \"%s\"", alias))
+			} else {
+				builder.WriteQuoted(gc)
+			}
 		}
 	} else {
 		builder.WriteByte('*')

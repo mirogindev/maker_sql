@@ -11,9 +11,22 @@ import (
 	"strings"
 )
 
+const (
+	Sum   = "sum"
+	Avg   = "avg"
+	Max   = "max"
+	Min   = "min"
+	Count = "count"
+)
+
+type AggrQuery struct {
+	Type   string
+	Fields []string
+}
+
 type Field struct {
 	Name       string
-	Path       string
+	AggrQuery  *AggrQuery
 	Query      *gorm.DB
 	TargetType interface{}
 }
@@ -32,28 +45,28 @@ type JsonBuild struct {
 func (s JsonBuild) ModifyStatement(stmt *gorm.Statement) {
 
 	SELECT := "SELECT"
-	//	FROM := "FROM"
+	//	GROUP_BY := "GROUP BY"
 	selectClause := stmt.Clauses[SELECT]
-
-	//fromClause := stmt.Clauses[FROM]
+	//	groupByClause := stmt.Clauses[GROUP_BY]
 
 	if selectClause.BeforeExpression == nil {
 		selectClause.BeforeExpression = &s
 	}
+	//if groupByClause.BeforeExpression == nil {
+	//	groupByClause.BeforeExpression = &GroupByHelper{}
+	//}
 
 	sc := &Select{Level: s.Level}
 	for _, c := range s.Fields {
-		if c.Query != nil {
+		if c.Query != nil || c.AggrQuery != nil {
 			continue
 		}
-		sc.AddColumn(clauses.Column{
-			Name: c.Name,
-		})
+		sc.AddColumn(Column{Name: c.Name})
 	}
 
 	selectClause.Expression = sc
 	stmt.Clauses[SELECT] = selectClause
-
+	//	stmt.Clauses[GROUP_BY] = groupByClause
 }
 
 func (s JsonBuild) Build(builder clauses.Builder) {
@@ -71,14 +84,6 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 		s.GenerateFieldJoins(gstm)
 	}
 
-	for _, event := range []string{"LIMIT", "ORDER BY", "WHERE", "FROM"} {
-		if cl, ok := gstm.Clauses[event]; ok {
-			cl.AfterExpression = s
-			gstm.Clauses[event] = cl
-			break
-		}
-	}
-
 	if s.JsonAgg {
 		builder.WriteString("SELECT json_agg(json_build_object(")
 	} else {
@@ -91,11 +96,6 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 	if len(s.Fields) > 0 {
 
 		for idx, column := range s.Fields {
-			f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(column.Name)]
-			if f == nil {
-				log.Fatalf("Field with name %s is not found", sqlgenerator.ToCamelCase(column.Name))
-				continue
-			}
 
 			if idx > 0 {
 				builder.WriteByte(',')
@@ -108,6 +108,10 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 			builder.WriteByte(',')
 			if column.Query != nil {
+				f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(column.Name)]
+				if t, ok := f.Tag.Lookup("sql_gen"); ok {
+					f = gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(t)]
+				}
 				level := s.Level + 1
 				query := column.Query
 				statement := column.Query.Statement
@@ -161,9 +165,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					st := gstm.Clauses["SELECT"].Expression.(*Select)
 
 					if !st.ColumnNameExist(foreignKeyName) {
-						st.AddColumn(clauses.Column{
-							Name: foreignKeyName,
-						})
+						st.AddColumn(Column{Name: foreignKeyName})
 					}
 
 					sql := query.Table(
@@ -209,7 +211,53 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 				}
 
 				builder.WriteByte('\n')
+			} else if column.AggrQuery != nil {
+				aggrQuery := column.AggrQuery
+
+				statement := gstm.Statement
+				selectClauses := statement.Clauses["SELECT"]
+				selectExpression := selectClauses.Expression.(*Select)
+				groupByClause := gstm.Clauses["GROUP BY"]
+				groupByColumns := make([]clauses.Column, len(aggrQuery.Fields)-1)
+
+				builder.WriteString("json_build_object(")
+				for i, ac := range aggrQuery.Fields {
+					f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(ac)]
+					alias := fmt.Sprintf("%s%v_%s", baseTable, s.Level, f.DBName)
+					aliasWithFun := fmt.Sprintf("%s_%s", alias, aggrQuery.Type)
+					if i > 0 {
+						builder.WriteByte(',')
+						builder.WriteByte('\n')
+					} else {
+						builder.WriteByte('\n')
+					}
+
+					builder.WriteString(fmt.Sprintf("'%s'", ac))
+					builder.WriteByte(',')
+					builder.WriteString(aliasWithFun)
+					selectExpression.AddColumn(Column{
+						Name:     ac,
+						Alias:    aliasWithFun,
+						Function: aggrQuery.Type,
+					})
+				}
+				for _, c := range s.Fields {
+					if c.Query == nil && c.AggrQuery == nil {
+						alias := fmt.Sprintf("%s%v_%s", baseTable, s.Level, c.Name)
+						groupByColumns = append(groupByColumns, clauses.Column{Name: alias})
+					}
+				}
+
+				groupByClause.BeforeExpression = GroupByHelper{}
+				groupByClause.Expression = clauses.GroupBy{
+					Columns: groupByColumns,
+				}
+				gstm.Clauses["GROUP BY"] = groupByClause
+
+				builder.WriteByte(')')
+
 			} else {
+				f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(column.Name)]
 				alias := fmt.Sprintf("%s%v_%s", baseTable, s.Level, f.DBName)
 				builder.WriteString(alias)
 			}
@@ -224,6 +272,14 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 		builder.WriteString(" FROM ( ")
 	} else {
 		log.Fatalf("Json clause must have at least one field")
+	}
+
+	for _, event := range []string{"LIMIT", "ORDER BY", "GROUP BY", "WHERE", "FROM"} {
+		if cl, ok := gstm.Clauses[event]; ok {
+			cl.AfterExpression = s
+			gstm.Clauses[event] = cl
+			break
+		}
 	}
 
 }

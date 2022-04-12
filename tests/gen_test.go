@@ -87,9 +87,18 @@ func Prepare() {
 	gName2 := "Group2"
 	gName3 := "Group3"
 	gName4 := "Group4"
+
 	tName1 := "Tag1"
 	tName2 := "Tag2"
 	tName3 := "Tag3"
+
+	tAggName1 := "aGroup1"
+	tAggName2 := "aGroup2"
+	//tAggName3 := "aGroup3"
+
+	tAggVal1 := 20
+	tAggVal2 := 30
+	tAggVal3 := 15
 
 	iName1 := "Item1"
 	iName2 := "Item2"
@@ -124,9 +133,9 @@ func Prepare() {
 	item3 := &models.Item{Name: &iName3, Group: ug4, Statuses: []*models.Status{st2}, InnerItems: []*models.InnerItem{iItem7, iItem8}}
 	item4 := &models.Item{Name: &iName4, Group: ug4, Statuses: []*models.Status{st1}, InnerItems: []*models.InnerItem{iItem8, iItem1}}
 
-	tag1 := &models.Tag{Name: &tName1, InnerItems: []*models.InnerItem{iItem1, iItem2}, Items: []*models.Item{item1, item2}}
-	tag2 := &models.Tag{Name: &tName2, InnerItems: []*models.InnerItem{iItem2, iItem3}, Items: []*models.Item{item2, item3}}
-	tag3 := &models.Tag{Name: &tName3, InnerItems: []*models.InnerItem{iItem3, iItem4}, Items: []*models.Item{item3, item4}}
+	tag1 := &models.Tag{Name: &tName1, AggrName: &tAggName1, AggrVal: &tAggVal1, InnerItems: []*models.InnerItem{iItem1, iItem2}, Items: []*models.Item{item1, item2}}
+	tag2 := &models.Tag{Name: &tName2, AggrName: &tAggName2, AggrVal: &tAggVal2, InnerItems: []*models.InnerItem{iItem2, iItem3}, Items: []*models.Item{item2, item3}}
+	tag3 := &models.Tag{Name: &tName3, AggrName: &tAggName2, AggrVal: &tAggVal3, InnerItems: []*models.InnerItem{iItem3, iItem4}, Items: []*models.Item{item3, item4}}
 
 	DB.Create(st1)
 	DB.Create(st2)
@@ -150,8 +159,8 @@ func Prepare() {
 	DB.Create(ug1)
 	DB.Create(ug2)
 
-	DB.Create(&models.User{Name: &uName1, GroupID: ug1.ID, Tags: []*models.Tag{tag1, tag2}, Items: []*models.Item{item1, item2}})
-	DB.Create(&models.User{Name: &uName2, GroupID: ug2.ID, Tags: []*models.Tag{tag1, tag3}, Items: []*models.Item{item3, item4}})
+	DB.Create(&models.User{Name: &uName1, AggrVal: 20, GroupID: ug1.ID, Tags: []*models.Tag{tag1, tag2}, Items: []*models.Item{item1, item2}})
+	DB.Create(&models.User{Name: &uName2, AggrVal: 30, GroupID: ug2.ID, Tags: []*models.Tag{tag1, tag3}, Items: []*models.Item{item3, item4}})
 
 }
 
@@ -277,17 +286,49 @@ func TestManyToManyRelationWithInnerManyToManyFieldFilter(t *testing.T) {
 }
 
 func TestSumAggregation(t *testing.T) {
-	var users []*models.UserAggregateSum
+	var users []*models.UserAggregate
 	Prepare()
 
 	err := DB.Debug().Table("users \"Users0\"").Model(&models.User{}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
-			{Name: "Sum", Path: "Sum(id)"},
-		}}).Group("id").Find(&users).Error
+			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
+		}}).Find(&users).Error
 
 	if err != nil {
 		panic(err)
 	}
 
+	assert.Len(t, users, 2)
+	assert.Equal(t, *users[0].Sum.AggrVal, 30)
+	assert.Equal(t, *users[1].Sum.AggrVal, 20)
+}
+
+func TestInnerSumAggregation(t *testing.T) {
+	var users []*models.User
+	Prepare()
+
+	tagsAggQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "aggr_name"},
+			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
+		}})
+
+	err := DB.Table("users \"Users0\"").Model(&models.User{}).Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "id"},
+			{Name: "tags_aggregate", Query: tagsAggQuery, TargetType: &models.Tag{}}},
+	}).Find(&users).Error
+
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 2)
+	assert.Len(t, users[0].TagsAggregate, 2)
+	assert.Len(t, users[1].TagsAggregate, 2)
+	assert.Equal(t, *users[0].TagsAggregate[0].Sum.AggrVal, 20)
+	assert.Equal(t, *users[0].TagsAggregate[1].Sum.AggrVal, 30)
+	assert.Equal(t, *users[1].TagsAggregate[0].Sum.AggrVal, 20)
+	assert.Equal(t, *users[1].TagsAggregate[1].Sum.AggrVal, 15)
 }
