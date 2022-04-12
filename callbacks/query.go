@@ -5,7 +5,6 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
-	"log"
 	"reflect"
 	"sqlgenerator/mclause"
 	"strings"
@@ -28,12 +27,16 @@ func Query(db *gorm.DB) {
 }
 
 func BuildQuerySQL(db *gorm.DB) {
+	var level *int
 	baseTable := clause.CurrentTable
 	baseTableAlias := baseTable
-	if db.Statement.TableExpr != nil {
-		spl := strings.Split(db.Statement.TableExpr.SQL, " ")
-		if len(spl) == 2 {
-			baseTableAlias = spl[1]
+
+	if c, ok := db.Statement.Clauses[mclause.JSON_BUILD]; ok {
+		jb := c.Expression.(*mclause.JsonBuild)
+		level = &jb.Level
+		baseTableAlias = fmt.Sprintf("\"%s%v\"", strings.Title(db.Statement.Table), jb.Level)
+		db.Statement.TableExpr = &clause.Expr{
+			SQL: fmt.Sprintf("%s %s", db.Statement.Table, baseTableAlias),
 		}
 
 	}
@@ -73,7 +76,7 @@ func BuildQuerySQL(db *gorm.DB) {
 			}
 		} else if db.Statement.Schema != nil && len(db.Statement.Omits) > 0 {
 			selectColumns, _ := db.Statement.SelectAndOmitColumns(false, false)
-			clauseSelect.Columns = make([]clause.Column, 0, len(db.Statement.Schema.DBNames))
+			clauseSelect.Columns = make([]clause.Column, len(db.Statement.Schema.DBNames))
 			for _, dbName := range db.Statement.Schema.DBNames {
 				if v, ok := selectColumns[dbName]; (ok && v) || !ok {
 					clauseSelect.Columns = append(clauseSelect.Columns, clause.Column{Table: db.Statement.Table, Name: dbName})
@@ -117,8 +120,6 @@ func BuildQuerySQL(db *gorm.DB) {
 				}
 			}
 
-			log.Println("----")
-
 			for _, join := range db.Statement.Joins {
 				splJoin := strings.Split(join.Name, ".")
 
@@ -129,8 +130,8 @@ func BuildQuerySQL(db *gorm.DB) {
 				} else if relation, ok := findRelation(db.Statement.Schema.Relationships.Relations, splJoin); ok {
 
 					if relation.Type == schema.Many2Many {
-						targetTableAliasName := getAlias(join.Name, db)
-						mmTableAliasName := getAlias(relation.JoinTable.Table, db)
+						targetTableAliasName := getAlias(join.Name, level)
+						mmTableAliasName := getAlias(relation.JoinTable.Table, level)
 
 						mmExprs := make([]clause.Expression, 0)
 						exprs := make([]clause.Expression, 0)
@@ -165,24 +166,24 @@ func BuildQuerySQL(db *gorm.DB) {
 							ON:    clause.Where{Exprs: exprs},
 						})
 					} else {
-						tableAliasName := getAlias(join.Name, db)
+						tableAliasName := getAlias(join.Name, level)
 
 						exprs := make([]clause.Expression, len(relation.References))
 						for idx, ref := range relation.References {
 							if ref.OwnPrimaryKey {
 								exprs[idx] = clause.Eq{
-									Column: clause.Column{Table: getAlias(ref.PrimaryKey.Schema.Table, db), Name: ref.PrimaryKey.DBName},
-									Value:  clause.Column{Table: getAlias(join.Name, db), Name: ref.ForeignKey.DBName},
+									Column: clause.Column{Table: getAlias(ref.PrimaryKey.Schema.Table, level), Name: ref.PrimaryKey.DBName},
+									Value:  clause.Column{Table: getAlias(join.Name, level), Name: ref.ForeignKey.DBName},
 								}
 							} else {
 								if ref.PrimaryValue == "" {
 									exprs[idx] = clause.Eq{
-										Column: clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, db), Name: ref.ForeignKey.DBName},
-										Value:  clause.Column{Table: getAlias(join.Name, db), Name: ref.PrimaryKey.DBName},
+										Column: clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, level), Name: ref.ForeignKey.DBName},
+										Value:  clause.Column{Table: getAlias(join.Name, level), Name: ref.PrimaryKey.DBName},
 									}
 								} else {
 									exprs[idx] = clause.Eq{
-										Column: clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, db), Name: ref.ForeignKey.DBName},
+										Column: clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, level), Name: ref.ForeignKey.DBName},
 										Value:  ref.PrimaryValue,
 									}
 								}
@@ -253,12 +254,10 @@ func findRelation(rels map[string]*schema.Relationship, arr []string) (*schema.R
 	return nil, false
 }
 
-func getAlias(name string, db *gorm.DB) string {
-	selectClause := db.Statement.Clauses["SELECT"]
-	if selectClause.BeforeExpression != nil {
-		if v, ok := selectClause.BeforeExpression.(*mclause.JsonBuild); ok {
-			return fmt.Sprintf("\"%s%v\"", strings.Title(name), v.Level)
-		}
+func getAlias(name string, level *int) string {
+
+	if level != nil {
+		return fmt.Sprintf("\"%s%v\"", strings.Title(name), *level)
 	}
 
 	return name

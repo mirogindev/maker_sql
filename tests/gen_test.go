@@ -70,7 +70,7 @@ func init() {
 func Prepare() {
 
 	err := Truncate(DB)
-	DB.Callback().Query().Register("gorm:query", callbacks.Query)
+	DB.Callback().Query().Replace("gorm:query", callbacks.Query)
 	if err != nil {
 		panic(err)
 	}
@@ -196,7 +196,7 @@ func TestManyToOneRelation(t *testing.T) {
 			{Name: "name"},
 		}})
 
-	err := DB.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
+	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
@@ -219,7 +219,7 @@ func TestOneToManyRelation(t *testing.T) {
 			{Name: "name"},
 		}})
 
-	err := DB.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
+	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
@@ -243,7 +243,7 @@ func TestManyToManyRelationWithManyToManyFieldFilter(t *testing.T) {
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}}).Joins("Items").Joins("InnerItems").Where(DB.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or("\"InnerItems\".name = 'Item1'").Group("id").Order("name desc")
-	err := DB.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
+	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
@@ -269,7 +269,7 @@ func TestManyToManyRelationWithInnerManyToManyFieldFilter(t *testing.T) {
 			{Name: "name"},
 		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Statuses").Joins("Items.Group").Where(DB.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or(db.Where("\"Items.InnerItems\".name = 'Item7'").Where("\"Items.Group\".name = 'Group3'").Where("\"Items.Statuses\".name = 'Status1'")).Group("id").Limit(10)
 
-	err := DB.Table("users \"Users0\"").Clauses(mclause.JsonBuild{
+	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
@@ -289,7 +289,7 @@ func TestSumAggregation(t *testing.T) {
 	var users []*models.UserAggregate
 	Prepare()
 
-	err := DB.Debug().Table("users \"Users0\"").Model(&models.User{}).Clauses(mclause.JsonBuild{
+	err := DB.Debug().Model(&models.User{}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
@@ -314,7 +314,7 @@ func TestInnerSumAggregation(t *testing.T) {
 			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
 		}})
 
-	err := DB.Table("users \"Users0\"").Model(&models.User{}).Clauses(mclause.JsonBuild{
+	err := DB.Model(&models.User{}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "tags_aggregate", Query: tagsAggQuery, TargetType: &models.Tag{}}},

@@ -19,6 +19,8 @@ const (
 	Count = "count"
 )
 
+var JSON_BUILD = "JSON_BUILD"
+
 type AggrQuery struct {
 	Type   string
 	Fields []string
@@ -45,13 +47,19 @@ type JsonBuild struct {
 func (s JsonBuild) ModifyStatement(stmt *gorm.Statement) {
 
 	SELECT := "SELECT"
+
 	//	GROUP_BY := "GROUP BY"
 	selectClause := stmt.Clauses[SELECT]
+	//	fs := stmt.Clauses["FOR"]
 	//	groupByClause := stmt.Clauses[GROUP_BY]
 
 	if selectClause.BeforeExpression == nil {
 		selectClause.BeforeExpression = &s
 	}
+
+	//if fs.BeforeExpression == nil {
+	//	fs.Expression = &s
+	//}
 	//if groupByClause.BeforeExpression == nil {
 	//	groupByClause.BeforeExpression = &GroupByHelper{}
 	//}
@@ -66,7 +74,7 @@ func (s JsonBuild) ModifyStatement(stmt *gorm.Statement) {
 
 	selectClause.Expression = sc
 	stmt.Clauses[SELECT] = selectClause
-	//	stmt.Clauses[GROUP_BY] = groupByClause
+	stmt.Clauses[JSON_BUILD] = clauses.Clause{Expression: &s}
 }
 
 func (s JsonBuild) Build(builder clauses.Builder) {
@@ -79,6 +87,10 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 	s.initialized = true
 
 	gstm := builder.(*gorm.Statement)
+
+	fc := gstm.Clauses["FOR"]
+	fc.Expression = s
+	gstm.Clauses["FOR"] = fc
 
 	if s.Level > 0 {
 		s.GenerateFieldJoins(gstm)
@@ -274,13 +286,13 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 		log.Fatalf("Json clause must have at least one field")
 	}
 
-	for _, event := range []string{"LIMIT", "ORDER BY", "GROUP BY", "WHERE", "FROM"} {
-		if cl, ok := gstm.Clauses[event]; ok {
-			cl.AfterExpression = s
-			gstm.Clauses[event] = cl
-			break
-		}
-	}
+	//for _, event := range []string{"LIMIT", "ORDER BY", "GROUP BY", "WHERE", "FROM"} {
+	//	if cl, ok := gstm.Clauses[event]; ok {
+	//		cl.AfterExpression = s
+	//		gstm.Clauses[event] = cl
+	//		break
+	//	}
+	//}
 
 }
 
