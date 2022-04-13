@@ -193,7 +193,7 @@ func TestManyToManyRelation(t *testing.T) {
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
-			{Name: "tags", Query: tagsQuery, TargetType: &models.Tag{}},
+			{Name: "tags", Query: tagsQuery},
 		}}).Joins("Tags").Where("\"Tags\".name = ?", "Tag3").Find(&users).Error
 	if err != nil {
 		panic(err)
@@ -216,7 +216,7 @@ func TestManyToOneRelation(t *testing.T) {
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
-			{Name: "group", Query: userGroupQuery, TargetType: &models.UserGroup{}},
+			{Name: "group", Query: userGroupQuery},
 		}}).Joins("Group").Where("\"Group\".name = ?", "Group1").Find(&users).Error
 
 	if err != nil {
@@ -239,7 +239,7 @@ func TestOneToManyRelation(t *testing.T) {
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
-			{Name: "items", Query: itemsQuery, TargetType: &models.Item{}},
+			{Name: "items", Query: itemsQuery},
 		}}).Joins("Items").Where("\"Items\".name = ?", "Item2").Find(&users).Error
 
 	if err != nil {
@@ -263,7 +263,7 @@ func TestManyToManyRelationWithManyToManyFieldFilter(t *testing.T) {
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
-			{Name: "tags", Query: tagsQuery, TargetType: &models.Tag{}},
+			{Name: "tags", Query: tagsQuery},
 		}}).Find(&users).Error
 
 	if err != nil {
@@ -289,7 +289,7 @@ func TestManyToManyRelationWithInnerManyToManyFieldFilter(t *testing.T) {
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
-			{Name: "tags", Query: tagsQuery, TargetType: &models.Tag{}},
+			{Name: "tags", Query: tagsQuery},
 		}}).Find(&users).Error
 
 	if err != nil {
@@ -333,7 +333,7 @@ func TestInnerSumAggregation(t *testing.T) {
 	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
-			{Name: "tags_aggregate", Query: tagsAggQuery, TargetType: &models.Tag{}}},
+			{Name: "tags_aggregate", Query: tagsAggQuery}},
 	}).Find(&users).Error
 
 	if err != nil {

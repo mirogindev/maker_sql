@@ -21,7 +21,7 @@ func BenchmarkSQLGeneration(b *testing.B) {
 			Fields: []mclause.Field{
 				{Name: "id"},
 				{Name: "name"},
-				{Name: "tags", Query: tagsQuery, TargetType: &models.Tag{}},
+				{Name: "tags", Query: tagsQuery},
 			}}).Find(&users).Statement.SQL.String()
 	}
 }

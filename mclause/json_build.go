@@ -7,6 +7,7 @@ import (
 	clauses "gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
 	"log"
+	"reflect"
 	"regexp"
 	"strings"
 )
@@ -27,10 +28,9 @@ type AggrQuery struct {
 }
 
 type Field struct {
-	Name       string
-	AggrQuery  *AggrQuery
-	Query      *gorm.DB
-	TargetType interface{}
+	Name      string
+	AggrQuery *AggrQuery
+	Query     *gorm.DB
 }
 
 type JsonBuild struct {
@@ -122,6 +122,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 			builder.WriteByte(',')
 			if column.Query != nil {
 				f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(column.Name)]
+
 				if t, ok := f.Tag.Lookup("sql_gen"); ok {
 					f = gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(t)]
 				}
@@ -137,6 +138,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 				builder.WriteByte('(')
 
 				if relation.Type == schema.Many2Many {
+					targetType := reflect.New(f.FieldType.Elem().Elem()).Interface()
 					selectExpression.Level = level
 
 					jsonExpression.ParentType = gstm.Model
@@ -160,7 +162,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 						),
 					).Clauses(clauses.From{
 						Joins: []clauses.Join{jc},
-					}).Find(column.TargetType).Statement
+					}).Find(targetType).Statement
 
 					gstm.Vars = append(gstm.Vars, qstm.Vars...)
 
@@ -169,6 +171,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					builder.WriteString(") as root")
 					builder.WriteString(")")
 				} else if relation.Type == schema.BelongsTo {
+					targetType := reflect.New(f.FieldType.Elem()).Interface()
 					primaryKeyName := relation.References[0].PrimaryKey.DBName
 					foreignKeyName := relation.References[0].ForeignKey.DBName
 
@@ -194,7 +197,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 								SQL: fmt.Sprintf("%s = %s_%s", primaryKeyName, baseTableAlias, foreignKeyName),
 							},
 						},
-					}).Find(column.TargetType).Statement
+					}).Find(targetType).Statement
 
 					gstm.Vars = append(gstm.Vars, qstm.Vars...)
 
@@ -202,6 +205,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					builder.WriteString(") as root")
 					builder.WriteString(")")
 				} else if relation.Type == schema.HasMany {
+					targetType := reflect.New(f.FieldType.Elem().Elem()).Interface()
 					primaryKeyName := relation.References[0].PrimaryKey.DBName
 					foreignKeyName := relation.References[0].ForeignKey.DBName
 					selectExpression.Level = level
@@ -221,7 +225,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 								SQL: fmt.Sprintf("%s = %s_%s", foreignKeyName, baseTableAlias, primaryKeyName),
 							},
 						},
-					}).Find(column.TargetType).Statement
+					}).Find(targetType).Statement
 
 					gstm.Vars = append(gstm.Vars, qstm.Vars...)
 
