@@ -173,12 +173,12 @@ func TestManyToManyRelation(t *testing.T) {
 			{Name: "name"},
 		}})
 
-	err := DB.Debug().Table("users \"Users0\"").Clauses(mclause.JsonBuild{
+	err := DB.Debug().Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
 			{Name: "tags", Query: tagsQuery, TargetType: &models.Tag{}},
-		}}).Joins("Tags").Where("\"Tags\".name = 'Tag3'").Find(&users).Error
+		}}).Joins("Tags").Where("\"Tags\".name = ?", "Tag3").Find(&users).Error
 	if err != nil {
 		panic(err)
 	}
@@ -201,7 +201,7 @@ func TestManyToOneRelation(t *testing.T) {
 			{Name: "id"},
 			{Name: "name"},
 			{Name: "group", Query: userGroupQuery, TargetType: &models.UserGroup{}},
-		}}).Joins("Group").Where("\"Group\".name = 'Group1'").Find(&users).Error
+		}}).Joins("Group").Where("\"Group\".name = ?", "Group1").Find(&users).Error
 
 	if err != nil {
 		panic(err)
@@ -224,7 +224,7 @@ func TestOneToManyRelation(t *testing.T) {
 			{Name: "id"},
 			{Name: "name"},
 			{Name: "items", Query: itemsQuery, TargetType: &models.Item{}},
-		}}).Joins("Items").Where("\"Items\".name = 'Item2'").Find(&users).Error
+		}}).Joins("Items").Where("\"Items\".name = ?", "Item2").Find(&users).Error
 
 	if err != nil {
 		panic(err)
@@ -242,7 +242,7 @@ func TestManyToManyRelationWithManyToManyFieldFilter(t *testing.T) {
 	tagsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
-		}}).Joins("Items").Joins("InnerItems").Where(DB.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or("\"InnerItems\".name = 'Item1'").Group("id").Order("name desc")
+		}}).Joins("Items").Joins("InnerItems").Where(DB.Where("\"Items\".name = ?", "Item1").Or("\"Items\".name = ?", "Item2")).Or("\"InnerItems\".name = ?", "Item1").Group("id").Order("name desc")
 	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
@@ -267,7 +267,7 @@ func TestManyToManyRelationWithInnerManyToManyFieldFilter(t *testing.T) {
 	tagsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
-		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Statuses").Joins("Items.Group").Where(DB.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = 'Item2'")).Or(db.Where("\"Items.InnerItems\".name = 'Item7'").Where("\"Items.Group\".name = 'Group3'").Where("\"Items.Statuses\".name = 'Status1'")).Group("id").Limit(10)
+		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Statuses").Joins("Items.Group").Where(DB.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = ?", "Item2")).Or(db.Where("\"Items.InnerItems\".name = ?", "Item7").Where("\"Items.Group\".name = ?", "Group3").Where("\"Items.Statuses\".name = ?", "Status1")).Group("id").Limit(10)
 
 	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{

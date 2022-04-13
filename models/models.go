@@ -44,7 +44,7 @@ func (j UserAggregate) Value() (driver.Value, error) {
 
 type UserAggregate struct {
 	ID  *int64            `json:"id"`
-	Sum *UserAggregateSum `json:"sum"`
+	Sum *UserAggregateSum `json:"sum" gorm:"-"`
 }
 
 type UserAggregateSum struct {

@@ -40,6 +40,7 @@ type JsonBuild struct {
 	initialized  bool
 	JsonAgg      bool
 	Fields       []Field
+	Vars         []interface{}
 	SelectClause *clauses.Select
 	Expression   clauses.Expression
 }
@@ -153,15 +154,18 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 						},
 					}
 
-					sql := query.Table(
+					qstm := query.Table(
 						fmt.Sprintf("%s \"%s\"", relation.FieldSchema.Table,
 							fmt.Sprintf("%s%v", relation.Name, level),
 						),
 					).Clauses(clauses.From{
 						Joins: []clauses.Join{jc},
-					}).Find(column.TargetType).Statement.SQL.String()
+					}).Find(column.TargetType).Statement
 
-					builder.WriteString(sql)
+					gstm.Vars = append(gstm.Vars, qstm.Vars...)
+
+					builder.WriteString(qstm.SQL.String())
+
 					builder.WriteString(") as root")
 					builder.WriteString(")")
 				} else if relation.Type == schema.BelongsTo {
@@ -180,7 +184,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 						st.AddColumn(Column{Name: foreignKeyName})
 					}
 
-					sql := query.Table(
+					qstm := query.Table(
 						fmt.Sprintf("%s %s", relation.FieldSchema.Table,
 							fmt.Sprintf("\"%s%v\"", strings.Title(relation.FieldSchema.Table), level),
 						),
@@ -190,9 +194,11 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 								SQL: fmt.Sprintf("%s = %s_%s", primaryKeyName, baseTableAlias, foreignKeyName),
 							},
 						},
-					}).Find(column.TargetType).Statement.SQL.String()
+					}).Find(column.TargetType).Statement
 
-					builder.WriteString(sql)
+					gstm.Vars = append(gstm.Vars, qstm.Vars...)
+
+					builder.WriteString(qstm.SQL.String())
 					builder.WriteString(") as root")
 					builder.WriteString(")")
 				} else if relation.Type == schema.HasMany {
@@ -205,7 +211,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					jsonExpression.Level = level
 					jsonExpression.JsonAgg = true
 
-					sql := query.Table(
+					qstm := query.Table(
 						fmt.Sprintf("%s %s", relation.FieldSchema.Table,
 							fmt.Sprintf("\"%s%v\"", strings.Title(relation.FieldSchema.Table), level),
 						),
@@ -215,9 +221,12 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 								SQL: fmt.Sprintf("%s = %s_%s", foreignKeyName, baseTableAlias, primaryKeyName),
 							},
 						},
-					}).Find(column.TargetType).Statement.SQL.String()
+					}).Find(column.TargetType).Statement
 
-					builder.WriteString(sql)
+					gstm.Vars = append(gstm.Vars, qstm.Vars...)
+
+					builder.WriteString(qstm.SQL.String())
+
 					builder.WriteString(") as root")
 					builder.WriteString(")")
 				}
@@ -285,15 +294,6 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 	} else {
 		log.Fatalf("Json clause must have at least one field")
 	}
-
-	//for _, event := range []string{"LIMIT", "ORDER BY", "GROUP BY", "WHERE", "FROM"} {
-	//	if cl, ok := gstm.Clauses[event]; ok {
-	//		cl.AfterExpression = s
-	//		gstm.Clauses[event] = cl
-	//		break
-	//	}
-	//}
-
 }
 
 func preprocessQuery(st *gorm.Statement, tableAlias string, level int) {
