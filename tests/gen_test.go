@@ -2,12 +2,12 @@ package tests
 
 import (
 	"fmt"
+	"github.com/mirogindev/maker_sql/callbacks"
+	"github.com/mirogindev/maker_sql/mclause"
+	"github.com/mirogindev/maker_sql/models"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"sqlgenerator/callbacks"
-	"sqlgenerator/mclause"
-	"sqlgenerator/models"
 	"testing"
 )
 

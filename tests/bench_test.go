@@ -1,9 +1,9 @@
 package tests
 
 import (
+	"github.com/mirogindev/maker_sql/mclause"
+	"github.com/mirogindev/maker_sql/models"
 	"gorm.io/gorm"
-	"sqlgenerator/mclause"
-	"sqlgenerator/models"
 	"testing"
 )
 

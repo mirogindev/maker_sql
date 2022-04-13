@@ -2,11 +2,11 @@ package callbacks
 
 import (
 	"fmt"
+	"github.com/mirogindev/maker_sql/mclause"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
 	"reflect"
-	"sqlgenerator/mclause"
 	"strings"
 )
 

@@ -2,12 +2,12 @@ package mclause
 
 import (
 	"fmt"
+	"github.com/mirogindev/maker_sql"
 	"gorm.io/gorm"
 	clauses "gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
 	"log"
 	"regexp"
-	"sqlgenerator"
 	"strings"
 )
 

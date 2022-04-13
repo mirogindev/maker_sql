@@ -1,4 +1,4 @@
-module sqlgenerator
+module github.com/mirogindev/maker_sql
 
 go 1.17
 
