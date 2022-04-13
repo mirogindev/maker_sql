@@ -289,7 +289,7 @@ func TestSumAggregation(t *testing.T) {
 	var users []*models.UserAggregate
 	Prepare()
 
-	err := DB.Debug().Model(&models.User{}).Clauses(mclause.JsonBuild{
+	err := DB.Model(&models.User{}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
