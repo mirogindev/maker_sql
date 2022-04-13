@@ -154,7 +154,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 						},
 					}
 
-					qstm := query.Table(
+					qstm := query.Session(&gorm.Session{DryRun: true}).Table(
 						fmt.Sprintf("%s \"%s\"", relation.FieldSchema.Table,
 							fmt.Sprintf("%s%v", relation.Name, level),
 						),
@@ -184,7 +184,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 						st.AddColumn(Column{Name: foreignKeyName})
 					}
 
-					qstm := query.Table(
+					qstm := query.Session(&gorm.Session{DryRun: true}).Table(
 						fmt.Sprintf("%s %s", relation.FieldSchema.Table,
 							fmt.Sprintf("\"%s%v\"", strings.Title(relation.FieldSchema.Table), level),
 						),
@@ -211,7 +211,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					jsonExpression.Level = level
 					jsonExpression.JsonAgg = true
 
-					qstm := query.Table(
+					qstm := query.Session(&gorm.Session{DryRun: true}).Table(
 						fmt.Sprintf("%s %s", relation.FieldSchema.Table,
 							fmt.Sprintf("\"%s%v\"", strings.Title(relation.FieldSchema.Table), level),
 						),

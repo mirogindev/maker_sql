@@ -164,11 +164,27 @@ func Prepare() {
 
 }
 
+func TestSimpleQuery(t *testing.T) {
+	var users []*models.User
+	Prepare()
+
+	err := DB.Debug().Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "id"},
+			{Name: "name"},
+		}}).Find(&users).Error
+	if err != nil {
+		panic(err)
+	}
+	assert.NotEmpty(t, users)
+	assert.Len(t, users, 2)
+}
+
 func TestManyToManyRelation(t *testing.T) {
 	var users []*models.User
 	Prepare()
 
-	tagsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
+	tagsQuery := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}})
@@ -191,7 +207,7 @@ func TestManyToOneRelation(t *testing.T) {
 	var users []*models.User
 	Prepare()
 
-	userGroupQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
+	userGroupQuery := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}})
@@ -214,7 +230,7 @@ func TestManyToOneRelation(t *testing.T) {
 func TestOneToManyRelation(t *testing.T) {
 	var users []*models.User
 	Prepare()
-	itemsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
+	itemsQuery := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}})
@@ -239,7 +255,7 @@ func TestManyToManyRelationWithManyToManyFieldFilter(t *testing.T) {
 	var users []*models.User
 	Prepare()
 
-	tagsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
+	tagsQuery := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}}).Joins("Items").Joins("InnerItems").Where(DB.Where("\"Items\".name = ?", "Item1").Or("\"Items\".name = ?", "Item2")).Or("\"InnerItems\".name = ?", "Item1").Group("id").Order("name desc")
@@ -264,7 +280,7 @@ func TestManyToManyRelationWithInnerManyToManyFieldFilter(t *testing.T) {
 	var users []*models.User
 	Prepare()
 
-	tagsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
+	tagsQuery := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Statuses").Joins("Items.Group").Where(DB.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = ?", "Item2")).Or(db.Where("\"Items.InnerItems\".name = ?", "Item7").Where("\"Items.Group\".name = ?", "Group3").Where("\"Items.Statuses\".name = ?", "Status1")).Group("id").Limit(10)
@@ -308,13 +324,13 @@ func TestInnerSumAggregation(t *testing.T) {
 	var users []*models.User
 	Prepare()
 
-	tagsAggQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
+	tagsAggQuery := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "aggr_name"},
 			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
 		}})
 
-	err := DB.Model(&models.User{}).Clauses(mclause.JsonBuild{
+	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "tags_aggregate", Query: tagsAggQuery, TargetType: &models.Tag{}}},
