@@ -10,7 +10,6 @@ import (
 func BenchmarkSQLGeneration(b *testing.B) {
 	var users []*models.User
 	Prepare()
-
 	for i := 0; i < b.N; i++ {
 		tagsQuery := DB.Session(&gorm.Session{DryRun: true}).Clauses(mclause.JsonBuild{
 			Fields: []mclause.Field{

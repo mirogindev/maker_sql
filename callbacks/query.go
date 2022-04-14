@@ -2,13 +2,44 @@ package callbacks
 
 import (
 	"fmt"
+	"github.com/iancoleman/strcase"
 	"github.com/mirogindev/maker_sql/mclause"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
+	"log"
 	"reflect"
+	"sort"
 	"strings"
 )
+
+func BeforeQuery(db *gorm.DB) {
+	if c, ok := db.Statement.Clauses[mclause.JSON_BUILD]; ok {
+		jb := c.Expression.(*mclause.JsonBuild)
+		level := jb.Level
+		baseTable := db.Statement.Table
+		baseTableAlias := fmt.Sprintf("%s%v", strings.Title(baseTable), level)
+		jb.BaseTable = baseTable
+		jb.BaseTableAlias = baseTableAlias
+		joins := prepareQuery(db.Statement, baseTableAlias, level)
+		if len(joins) > 0 {
+			sj := sortJoins(joins)
+
+			curJoinsMap := make(map[string]string)
+			if j := db.Statement.Joins; j != nil {
+				for _, k := range j {
+					curJoinsMap[k.Name] = k.Name
+				}
+			}
+
+			for _, j := range sj {
+				if _, ok2 := curJoinsMap[j]; !ok2 {
+					db = db.Joins(j)
+				}
+			}
+		}
+	}
+}
 
 func Query(db *gorm.DB) {
 	if db.Error == nil {
@@ -261,4 +292,142 @@ func getAlias(name string, level *int) string {
 	}
 
 	return name
+}
+
+func prepareQuery(st *gorm.Statement, tableAlias string, level int) map[string]string {
+	WhereName := "WHERE"
+	GroupByName := "GROUP BY"
+	OrderByName := "ORDER BY"
+
+	cl := st.Clauses
+	whereClause := cl[WhereName]
+	groupBy := cl[GroupByName]
+	orderBy := cl[OrderByName]
+	jExpr := whereClause.Expression
+	gExpr := groupBy.Expression
+	oExpr := orderBy.Expression
+
+	joins := make(map[string]string)
+
+	if wh, ok := jExpr.(clause.Where); ok {
+		wh.Exprs = preprocessWhereClause(wh.Exprs, tableAlias, level, joins)
+		whereClause.Expression = wh
+		cl[WhereName] = whereClause
+	}
+
+	if gb, ok := gExpr.(clause.GroupBy); ok {
+		gb.Columns = preprocessGroupBYClause(gb.Columns, tableAlias, level, joins)
+		groupBy.Expression = gb
+		cl[GroupByName] = groupBy
+	}
+
+	if gb, ok := oExpr.(clause.OrderBy); ok {
+		gb.Columns = preprocessOrderBYClause(gb.Columns, tableAlias, level, joins)
+		orderBy.Expression = gb
+		cl[OrderByName] = orderBy
+	}
+	return joins
+}
+
+func preprocessOrderBYClause(cols []clause.OrderByColumn, tableAlias string, level int, joins map[string]string) []clause.OrderByColumn {
+	tableAlias = fmt.Sprintf("%s", tableAlias)
+	for i, v := range cols {
+		spl := strings.Split(v.Column.Name, " ")
+		var join []string
+		v.Column.Name, join = replaceTableNamesWIthLevel(spl[0], tableAlias, level)
+		if len(spl) > 1 {
+			v.Column.Name = fmt.Sprintf("%s %s", v.Column.Name, spl[1])
+		}
+		cols[i] = v
+		if join != nil {
+			for _, j := range join {
+				joins[j] = j
+			}
+
+		}
+	}
+
+	return cols
+}
+
+func preprocessGroupBYClause(cols []clause.Column, tableAlias string, level int, joins map[string]string) []clause.Column {
+	for i, v := range cols {
+		var join []string
+		v.Name, join = replaceTableNamesWIthLevel(v.Name, tableAlias, level)
+		cols[i] = v
+		if join != nil {
+			for _, j := range join {
+				joins[j] = j
+			}
+
+		}
+	}
+
+	return cols
+}
+
+func sortJoins(joins map[string]string) []string {
+	arr := make([]string, len(joins))
+	counter := 0
+	for i, _ := range joins {
+		arr[counter] = i
+		counter++
+	}
+
+	sort.Slice(arr, func(i, j int) bool {
+		return len(strings.Split(arr[i], ".")) < len(strings.Split(arr[j], "."))
+	})
+
+	return arr
+}
+
+func preprocessWhereClause(exprs []clause.Expression, tableAlias string, level int, joins map[string]string) []clause.Expression {
+
+	for i, v := range exprs {
+		var join []string
+		if ce, ok := v.(clause.Expr); ok {
+			ce.SQL, join = replaceTableNamesWIthLevel(ce.SQL, tableAlias, level)
+			exprs[i] = ce
+		} else if ne, ok := v.(clause.NamedExpr); ok {
+			ne.SQL, join = replaceTableNamesWIthLevel(ne.SQL, tableAlias, level)
+			exprs[i] = ne
+		} else if oc, ok := v.(clause.OrConditions); ok {
+			oc.Exprs = preprocessWhereClause(oc.Exprs, tableAlias, level, joins)
+			exprs[i] = oc
+		} else if ac, ok := v.(clause.AndConditions); ok {
+			ac.Exprs = preprocessWhereClause(ac.Exprs, tableAlias, level, joins)
+			exprs[i] = ac
+		} else {
+			log.Println("Invalid type %T", v)
+		}
+		if join != nil {
+			for _, j := range join {
+				joins[j] = j
+			}
+
+		}
+	}
+	return exprs
+}
+
+func replaceTableNamesWIthLevel(_sql string, tableAlias string, level int) (string, []string) {
+	s := strings.Split(_sql, ".")
+	ln := len(s)
+	if ln < 2 {
+		return fmt.Sprintf("\"%s\".%s", tableAlias, _sql), nil
+	}
+	fn := s[ln-1]
+	var sb strings.Builder
+	joins := make([]string, 0)
+	for i, s := range s[0 : ln-1] {
+		if i > 0 {
+			sb.WriteByte('.')
+		}
+		n := strcase.ToCamel(s)
+		sb.WriteString(n)
+		joins = append(joins, sb.String())
+	}
+	rp := fmt.Sprintf("\"%s%v\".%s", sb.String(), level, fn)
+
+	return rp, joins
 }
