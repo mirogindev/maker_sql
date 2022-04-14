@@ -217,7 +217,7 @@ func TestManyToOneRelation(t *testing.T) {
 			{Name: "id"},
 			{Name: "name"},
 			{Name: "group", Query: userGroupQuery},
-		}}).Joins("Group").Where("\"Group\".name = ?", "Group1").Find(&users).Error
+		}}).Joins("Group").Where("group.name = ?", "Group1").Find(&users).Error
 
 	if err != nil {
 		panic(err)
@@ -258,7 +258,7 @@ func TestManyToManyRelationWithManyToManyFieldFilter(t *testing.T) {
 	tagsQuery := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
-		}}).Joins("Items").Joins("InnerItems").Where(DB.Where("\"Items\".name = ?", "Item1").Or("\"Items\".name = ?", "Item2")).Or("\"InnerItems\".name = ?", "Item1").Group("id").Order("name desc")
+		}}).Joins("Items").Joins("InnerItems").Where(DB.Where("items.name = ?", "Item1").Or("items.name = ?", "Item2")).Or("InnerItems.name = ?", "Item1").Group("id").Order("name desc")
 	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
@@ -283,7 +283,7 @@ func TestManyToManyRelationWithInnerManyToManyFieldFilter(t *testing.T) {
 	tagsQuery := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
-		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Statuses").Joins("Items.Group").Where(DB.Where("\"Items\".name = 'Item1'").Or("\"Items\".name = ?", "Item2")).Or(db.Where("\"Items.InnerItems\".name = ?", "Item7").Where("\"Items.Group\".name = ?", "Group3").Where("\"Items.Statuses\".name = ?", "Status1")).Group("id").Limit(10)
+		}}).Joins("Items").Joins("Items.InnerItems").Joins("Items.Statuses").Joins("Items.Group").Where(DB.Where("Items.name = 'Item1'").Or("Items.name = ?", "Item2").Or("name = ?", "Tag2")).Or(db.Where("Items.InnerItems.name = ?", "Item7").Where("Items.Group.name = ?", "Group3").Where("Items.Statuses.name = ?", "Status1")).Group("id").Limit(10)
 
 	err := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{

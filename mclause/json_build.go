@@ -2,6 +2,7 @@ package mclause
 
 import (
 	"fmt"
+	"github.com/iancoleman/strcase"
 	"github.com/mirogindev/maker_sql"
 	"gorm.io/gorm"
 	clauses "gorm.io/gorm/clause"
@@ -411,9 +412,22 @@ func (s JsonBuild) buildJoinCondition(references []*schema.Reference, baseTableA
 }
 
 func replaceTableNamesWIthLevel(_sql string, level int) string {
-	var re = regexp.MustCompile(`"(.*?)"`)
-	s := re.ReplaceAllString(_sql, strings.ToLower(fmt.Sprintf(`"${1}%v"`, level)))
-	return s
+	s := strings.Split(_sql, ".")
+	ln := len(s)
+	if ln < 2 {
+		return _sql
+	}
+	fn := s[ln-1]
+	var sb strings.Builder
+	for i, s := range s[0 : ln-1] {
+		if i > 0 {
+			sb.WriteByte('.')
+		}
+		sb.WriteString(strcase.ToCamel(s))
+	}
+	rp := fmt.Sprintf("\"%s%v\".%s", sb.String(), level, fn)
+
+	return rp
 }
 
 func replaceColumnNamesWIthLevel(_sql string, tableAlias string, level int) string {
