@@ -117,10 +117,10 @@ func Prepare() {
 	st3 := &models.Status{Name: &status3}
 	st4 := &models.Status{Name: &status4}
 
-	ug1 := &models.UserGroup{Name: &gName1}
-	ug2 := &models.UserGroup{Name: &gName2}
-	ug3 := &models.UserGroup{Name: &gName3}
-	ug4 := &models.UserGroup{Name: &gName4}
+	ug1 := &models.UserGroup{Name: &gName1, Status: st1, StatusesMany: []*models.Status{st1, st4}}
+	ug2 := &models.UserGroup{Name: &gName2, Status: st2, StatusesMany: []*models.Status{st1, st3}}
+	ug3 := &models.UserGroup{Name: &gName3, Status: st3, StatusesMany: []*models.Status{st1, st2}}
+	ug4 := &models.UserGroup{Name: &gName4, Status: st3, StatusesMany: []*models.Status{st2, st4}}
 
 	iItem1 := &models.InnerItem{Name: &iName1}
 	iItem2 := &models.InnerItem{Name: &iName2}
@@ -268,25 +268,53 @@ func TestManyToOneRelation(t *testing.T) {
 }
 
 func TestManyToOneRelationOnly(t *testing.T) {
-	var users []*models.User
-	Prepare()
+	type Cond struct {
+		Left string
+		Val  interface{}
+	}
+
+	type Variant struct {
+		Conds []*Cond
+	}
+
+	var variants = []*Variant{
+		{Conds: []*Cond{
+			{Left: "group.name = ?", Val: "Group1"},
+			{Left: "group.status.name = ?", Val: "Status1"},
+		}},
+		{Conds: []*Cond{
+			{Left: "group.name = ?", Val: "Group1"},
+			{Left: "group.statuses_many.name = ?", Val: "Status1"},
+		}},
+	}
 
 	userGroupQuery := DB.Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}})
 
-	err := DB.Debug().Clauses(mclause.JsonBuild{
-		Fields: []mclause.Field{
-			{Name: "group", Query: userGroupQuery},
-		}}).Where("group.name = ?", "Group1").Find(&users).Error
+	for i, v := range variants {
+		t.Run(fmt.Sprintf("Var%v", i), func(t *testing.T) {
+			var users []*models.User
+			Prepare()
+			tx := DB.Debug().Clauses(mclause.JsonBuild{
+				Fields: []mclause.Field{
+					{Name: "group", Query: userGroupQuery},
+				}})
 
-	if err != nil {
-		panic(err)
+			for _, c := range v.Conds {
+				tx.Where(c.Left, c.Val)
+			}
+
+			err := tx.Find(&users).Error
+
+			if err != nil {
+				panic(err)
+			}
+			assert.Len(t, users, 1)
+			assert.NotEmpty(t, users[0].Group)
+		})
 	}
-
-	assert.Len(t, users, 1)
-	assert.NotEmpty(t, users[0].Group)
 }
 
 func TestOneToManyRelation(t *testing.T) {

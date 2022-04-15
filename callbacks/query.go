@@ -158,7 +158,7 @@ func BuildQuerySQL(db *gorm.DB) {
 					joins = append(joins, clause.Join{
 						Expression: clause.NamedExpr{SQL: join.Name, Vars: join.Conds},
 					})
-				} else if relation, ok := findRelation(db.Statement.Schema.Relationships.Relations, splJoin); ok {
+				} else if relation, path, ok := findRelation(db.Statement.Schema.Relationships.Relations, splJoin); ok {
 
 					if relation.Type == schema.Many2Many {
 						targetTableAliasName := getAlias(join.Name, level)
@@ -210,7 +210,7 @@ func BuildQuerySQL(db *gorm.DB) {
 							} else {
 								foreignTableAlias := ""
 								if ref.ForeignKey.Schema.Table != db.Statement.Table {
-									foreignTableAlias = getAlias(ref.ForeignKey.Schema.Name, level)
+									foreignTableAlias = getAlias(path, level)
 								} else {
 									foreignTableAlias = getAlias(ref.ForeignKey.Schema.Table, level)
 								}
@@ -280,16 +280,23 @@ func BuildQuerySQL(db *gorm.DB) {
 	}
 }
 
-func findRelation(rels map[string]*schema.Relationship, arr []string) (*schema.Relationship, bool) {
+func findRelation(rels map[string]*schema.Relationship, arr []string) (*schema.Relationship, string, bool) {
+	var path string
 	for i, r := range arr {
 		if rel, ok := rels[r]; ok {
 			if len(arr) > 1 {
-				return findRelation(rel.FieldSchema.Relationships.Relations, arr[i+1:])
+				path = r
+				iRel, iPath, iOk := findRelation(rel.FieldSchema.Relationships.Relations, arr[i+1:])
+				if iPath != "" {
+					path = fmt.Sprintf("%s.%s", path, iPath)
+				}
+
+				return iRel, path, iOk
 			}
-			return rel, true
+			return rel, path, true
 		}
 	}
-	return nil, false
+	return nil, "", false
 }
 
 func getAlias(name string, level *int) string {
