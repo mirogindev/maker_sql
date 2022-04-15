@@ -204,6 +204,27 @@ func TestManyToManyRelation(t *testing.T) {
 	assert.Len(t, users[0].Tags, 2)
 }
 
+func TestManyToManyRelationOnly(t *testing.T) {
+	var users []*models.User
+	Prepare()
+
+	tagsQuery := DB.Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "name"},
+		}})
+
+	err := DB.Debug().Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "tags", Query: tagsQuery},
+		}}).Where("\"Tags\".name = ?", "Tag3").Find(&users).Error
+	if err != nil {
+		panic(err)
+	}
+	assert.NotEmpty(t, users)
+	assert.Len(t, users, 1)
+	assert.Len(t, users[0].Tags, 2)
+}
+
 func TestManyToOneRelation(t *testing.T) {
 	var users []*models.User
 	Prepare()
@@ -228,6 +249,28 @@ func TestManyToOneRelation(t *testing.T) {
 	assert.NotEmpty(t, users[0].Group)
 }
 
+func TestManyToOneRelationOnly(t *testing.T) {
+	var users []*models.User
+	Prepare()
+
+	userGroupQuery := DB.Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "name"},
+		}})
+
+	err := DB.Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "group", Query: userGroupQuery},
+		}}).Where("group.name = ?", "Group1").Find(&users).Error
+
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 1)
+	assert.NotEmpty(t, users[0].Group)
+}
+
 func TestOneToManyRelation(t *testing.T) {
 	var users []*models.User
 	Prepare()
@@ -240,6 +283,28 @@ func TestOneToManyRelation(t *testing.T) {
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
+			{Name: "items", Query: itemsQuery},
+		}}).Where("\"Items\".name = ?", "Item2").Find(&users).Error
+
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 1)
+	assert.Len(t, users[0].Items, 2)
+
+}
+
+func TestOneToManyRelationOnly(t *testing.T) {
+	var users []*models.User
+	Prepare()
+	itemsQuery := DB.Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "name"},
+		}})
+
+	err := DB.Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
 			{Name: "items", Query: itemsQuery},
 		}}).Where("\"Items\".name = ?", "Item2").Find(&users).Error
 

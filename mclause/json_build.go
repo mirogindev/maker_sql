@@ -20,6 +20,7 @@ const (
 )
 
 var JSON_BUILD = "JSON_BUILD"
+var SELECT = "SELECT"
 
 type AggrQuery struct {
 	Type   string
@@ -47,9 +48,6 @@ type JsonBuild struct {
 }
 
 func (s JsonBuild) ModifyStatement(stmt *gorm.Statement) {
-
-	SELECT := "SELECT"
-
 	selectClause := stmt.Clauses[SELECT]
 
 	if selectClause.BeforeExpression == nil {
@@ -79,10 +77,14 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 	s.initialized = true
 
 	gstm := builder.(*gorm.Statement)
+	baseSelectClause := gstm.Clauses[SELECT]
+	baseSelectExpression := baseSelectClause.Expression.(*Select)
+	log.Println(baseSelectExpression)
 
-	fc := gstm.Clauses["FOR"]
-	fc.Expression = s
-	gstm.Clauses["FOR"] = fc
+	baseForClause := gstm.Clauses["FOR"]
+	baseForClause.Expression = s
+
+	gstm.Clauses["FOR"] = baseForClause
 
 	if s.Level > 0 {
 		s.GenerateFieldJoins(gstm)
@@ -138,7 +140,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 					jc := clauses.Join{
 						ON: clauses.Where{
-							Exprs: s.buildJoinCondition(relation.References, baseTableAlias),
+							Exprs: s.buildJoinCondition(relation.References, baseTableAlias, baseSelectExpression),
 						},
 						Table: clauses.Table{
 							Name:  relation.JoinTable.Table,
@@ -171,10 +173,8 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					jsonExpression.FieldInfo = f
 					jsonExpression.Level = level
 
-					st := gstm.Clauses["SELECT"].Expression.(*Select)
-
-					if !st.ColumnNameExist(foreignKeyName) {
-						st.AddColumn(Column{Name: foreignKeyName})
+					if !baseSelectExpression.ColumnNameExist(foreignKeyName) {
+						baseSelectExpression.AddColumn(Column{Name: foreignKeyName})
 					}
 
 					qstm := query.Session(&gorm.Session{DryRun: true}).Table(
@@ -204,6 +204,10 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					jsonExpression.FieldInfo = f
 					jsonExpression.Level = level
 					jsonExpression.JsonAgg = true
+
+					if !baseSelectExpression.ColumnNameExist(primaryKeyName) {
+						baseSelectExpression.AddColumn(Column{Name: primaryKeyName})
+					}
 
 					qstm := query.Session(&gorm.Session{DryRun: true}).Table(
 						fmt.Sprintf("%s %s", relation.FieldSchema.Table,
@@ -302,12 +306,17 @@ func (s JsonBuild) GenerateFieldJoins(builder *gorm.Statement) {
 
 }
 
-func (s JsonBuild) buildJoinCondition(references []*schema.Reference, baseTableAlias string) []clauses.Expression {
+func (s JsonBuild) buildJoinCondition(references []*schema.Reference, baseTableAlias string, selectClause *Select) []clauses.Expression {
 	if len(references) > 1 {
 		andCond := clauses.AndConditions{}
 		for _, r := range references {
 			var exp clauses.NamedExpr
 			if r.OwnPrimaryKey {
+				if !selectClause.ColumnNameExist(r.PrimaryKey.DBName) {
+					selectClause.AddColumn(Column{
+						Name: r.PrimaryKey.DBName,
+					})
+				}
 				exp = clauses.NamedExpr{
 					SQL: fmt.Sprintf("%s = %s_%s", r.ForeignKey.DBName, baseTableAlias, r.PrimaryKey.DBName),
 				}
