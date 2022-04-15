@@ -201,20 +201,27 @@ func BuildQuerySQL(db *gorm.DB) {
 
 						exprs := make([]clause.Expression, len(relation.References))
 						for idx, ref := range relation.References {
+
 							if ref.OwnPrimaryKey {
 								exprs[idx] = clause.Eq{
 									Column: clause.Column{Table: getAlias(ref.PrimaryKey.Schema.Table, level), Name: ref.PrimaryKey.DBName},
 									Value:  clause.Column{Table: getAlias(join.Name, level), Name: ref.ForeignKey.DBName},
 								}
 							} else {
+								foreignTableAlias := ""
+								if ref.ForeignKey.Schema.Table != db.Statement.Table {
+									foreignTableAlias = getAlias(ref.ForeignKey.Schema.Name, level)
+								} else {
+									foreignTableAlias = getAlias(ref.ForeignKey.Schema.Table, level)
+								}
 								if ref.PrimaryValue == "" {
 									exprs[idx] = clause.Eq{
-										Column: clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, level), Name: ref.ForeignKey.DBName},
+										Column: clause.Column{Table: foreignTableAlias, Name: ref.ForeignKey.DBName},
 										Value:  clause.Column{Table: getAlias(join.Name, level), Name: ref.PrimaryKey.DBName},
 									}
 								} else {
 									exprs[idx] = clause.Eq{
-										Column: clause.Column{Table: getAlias(ref.ForeignKey.Schema.Table, level), Name: ref.ForeignKey.DBName},
+										Column: clause.Column{Table: foreignTableAlias, Name: ref.ForeignKey.DBName},
 										Value:  ref.PrimaryValue,
 									}
 								}

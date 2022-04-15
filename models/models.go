@@ -72,6 +72,7 @@ type User struct {
 	AggrVal       int             `json:"aggr_val"`
 	GroupID       *int64          `json:"group_id" mapstructure:"group_id" graphql:"group_id"`
 	Group         *UserGroup      `json:"group" mapstructure:"group" gorm:"foreignKey:GroupID"`
+	IsAdmin       *bool           `json:"is_admin" mapstructure:"is_admin" graphql:"is_admin"`
 }
 
 type Status struct {

@@ -83,6 +83,8 @@ func Prepare() {
 
 	uName1 := "User1"
 	uName2 := "User2"
+	uIsAdmin1 := true
+	uIsAdmin2 := false
 
 	gName1 := "Group1"
 	gName2 := "Group2"
@@ -160,8 +162,8 @@ func Prepare() {
 	DB.Create(ug1)
 	DB.Create(ug2)
 
-	DB.Create(&models.User{Name: &uName1, AggrVal: 20, GroupID: ug1.ID, Tags: []*models.Tag{tag1, tag2}, Items: []*models.Item{item1, item2}})
-	DB.Create(&models.User{Name: &uName2, AggrVal: 30, GroupID: ug2.ID, Tags: []*models.Tag{tag1, tag3}, Items: []*models.Item{item3, item4}})
+	DB.Create(&models.User{Name: &uName1, AggrVal: 20, IsAdmin: &uIsAdmin1, GroupID: ug1.ID, Tags: []*models.Tag{tag1, tag2}, Items: []*models.Item{item1, item2}})
+	DB.Create(&models.User{Name: &uName2, AggrVal: 30, IsAdmin: &uIsAdmin2, GroupID: ug2.ID, Tags: []*models.Tag{tag1, tag3}, Items: []*models.Item{item3, item4}})
 
 }
 
@@ -179,6 +181,22 @@ func TestSimpleQuery(t *testing.T) {
 	}
 	assert.NotEmpty(t, users)
 	assert.Len(t, users, 2)
+}
+
+func TestSimpleQueryWithBooleanFilter(t *testing.T) {
+	var users []*models.User
+	Prepare()
+
+	err := DB.Debug().Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "id"},
+			{Name: "name"},
+		}}).Where("is_admin = ?", true).Find(&users).Error
+	if err != nil {
+		panic(err)
+	}
+	assert.NotEmpty(t, users)
+	assert.Len(t, users, 1)
 }
 
 func TestManyToManyRelation(t *testing.T) {
@@ -258,7 +276,7 @@ func TestManyToOneRelationOnly(t *testing.T) {
 			{Name: "name"},
 		}})
 
-	err := DB.Clauses(mclause.JsonBuild{
+	err := DB.Debug().Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "group", Query: userGroupQuery},
 		}}).Where("group.name = ?", "Group1").Find(&users).Error
@@ -325,7 +343,7 @@ func TestManyToManyRelationWithManyToManyFieldFilter(t *testing.T) {
 		Fields: []mclause.Field{
 			{Name: "name"},
 		}}).Where(DB.Where("items.name = ?", "Item1").Or("items.name = ?", "Item2")).Or("inner_items.name = ?", "Item1").Group("id").Order("name desc")
-	err := DB.Clauses(mclause.JsonBuild{
+	err := DB.Debug().Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
