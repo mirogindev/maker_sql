@@ -2,8 +2,10 @@ package mclause
 
 import (
 	"fmt"
+	"github.com/iancoleman/strcase"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/schema"
 	"strings"
 )
 
@@ -49,6 +51,7 @@ func (s Select) Name() string {
 
 func (s Select) Build(builder clause.Builder) {
 	gstm := builder.(*gorm.Statement)
+	fieldsMap := convertToCCMap(gstm.Schema.FieldsByName)
 	baseTable := gstm.Schema.Table
 	baseTableWithLevel := fmt.Sprintf("%s%v", baseTable, s.Level)
 
@@ -60,7 +63,7 @@ func (s Select) Build(builder clause.Builder) {
 		}
 
 		for idx, column := range s.Columns {
-			f := gstm.Schema.FieldsByDBName[column.Name]
+			f := fieldsMap[column.Name]
 
 			alias := column.Alias
 			if alias == "" {
@@ -90,6 +93,14 @@ func (s Select) Build(builder clause.Builder) {
 	} else {
 		builder.WriteByte('*')
 	}
+}
+
+func convertToCCMap(m map[string]*schema.Field) map[string]*schema.Field {
+	res := make(map[string]*schema.Field)
+	for k, v := range m {
+		res[strcase.ToSnake(k)] = v
+	}
+	return res
 }
 
 func (s Select) MergeClause(c *clause.Clause) {

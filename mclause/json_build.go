@@ -79,7 +79,6 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 	gstm := builder.(*gorm.Statement)
 	baseSelectClause := gstm.Clauses[SELECT]
 	baseSelectExpression := baseSelectClause.Expression.(*Select)
-	log.Println(baseSelectExpression)
 
 	baseForClause := gstm.Clauses["FOR"]
 	baseForClause.Expression = s
