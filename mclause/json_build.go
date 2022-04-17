@@ -2,7 +2,9 @@ package mclause
 
 import (
 	"fmt"
+	"github.com/iancoleman/strcase"
 	"github.com/mirogindev/maker_sql"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	clauses "gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
@@ -260,9 +262,29 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 					})
 				}
 				for _, c := range s.Fields {
-					if c.Query == nil && c.AggrQuery == nil {
-						alias := fmt.Sprintf("%s%v_%s", baseTable, s.Level, c.Name)
-						groupByColumns = append(groupByColumns, clauses.Column{Name: alias})
+					if c.AggrQuery == nil {
+						if c.Query != nil {
+							fr := gstm.Schema.Relationships.Relations[strcase.ToCamel(c.Name)]
+							if fr == nil {
+								logrus.Panicf("Reference field %s is not found", c.Name)
+							}
+
+							for _, l := range fr.References {
+								var alias string
+
+								if fr.Type == schema.Many2Many {
+									alias = fmt.Sprintf("%s%v_%s", baseTable, s.Level, l.PrimaryKey.DBName)
+								} else {
+									alias = fmt.Sprintf("%s%v_%s", baseTable, s.Level, l.ForeignKey.DBName)
+								}
+								groupByColumns = append(groupByColumns, clauses.Column{Name: alias})
+							}
+
+						} else {
+							alias := fmt.Sprintf("%s%v_%s", baseTable, s.Level, c.Name)
+							groupByColumns = append(groupByColumns, clauses.Column{Name: alias})
+						}
+
 					}
 				}
 

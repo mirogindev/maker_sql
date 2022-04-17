@@ -432,6 +432,54 @@ func TestSumAggregation(t *testing.T) {
 	assert.Equal(t, *users[1].Sum.AggrVal, 20)
 }
 
+func TestSumAggregationWithHasMany(t *testing.T) {
+	var users []*models.UserAggregate
+	Prepare()
+
+	groupQuery := DB.Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "name"},
+		}})
+
+	err := DB.Model(&models.User{}).Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "group", Query: groupQuery},
+			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
+		}}).Find(&users).Error
+
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 2)
+	assert.Equal(t, *users[0].Sum.AggrVal, 30)
+	assert.Equal(t, *users[1].Sum.AggrVal, 20)
+}
+
+func TestSumAggregationWithManyToMany(t *testing.T) {
+	var users []*models.UserAggregate
+	Prepare()
+
+	tagsQuery := DB.Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "name"},
+		}})
+
+	err := DB.Model(&models.User{}).Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "tags", Query: tagsQuery},
+			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
+		}}).Find(&users).Error
+
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 2)
+	assert.Equal(t, *users[0].Sum.AggrVal, 30)
+	assert.Equal(t, *users[1].Sum.AggrVal, 20)
+}
+
 func TestInnerSumAggregation(t *testing.T) {
 	var users []*models.User
 	Prepare()
