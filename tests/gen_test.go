@@ -419,7 +419,7 @@ func TestSumAggregation(t *testing.T) {
 
 	err := DB.Model(&models.User{}).Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
-			{Name: "id"},
+			{Name: "aggr_val"},
 			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
 		}}).Find(&users).Error
 
@@ -428,8 +428,8 @@ func TestSumAggregation(t *testing.T) {
 	}
 
 	assert.Len(t, users, 2)
-	assert.Equal(t, *users[0].Sum.AggrVal, 30)
-	assert.Equal(t, *users[1].Sum.AggrVal, 20)
+	assert.Equal(t, *users[0].Sum.AggrVal, 20)
+	assert.Equal(t, *users[1].Sum.AggrVal, 30)
 }
 
 func TestSumAggregationWithHasMany(t *testing.T) {

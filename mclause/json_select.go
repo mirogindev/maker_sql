@@ -26,7 +26,7 @@ func (s *Select) AddColumn(col Column) {
 	if s.ColumnsMap == nil {
 		s.ColumnsMap = make(map[string]Column)
 	}
-	if _, ok := s.ColumnsMap[col.Name]; ok {
+	if _, ok := s.ColumnsMap[col.Name]; col.Function == "" && ok {
 		return
 	}
 	s.ColumnsMap[col.Name] = col
