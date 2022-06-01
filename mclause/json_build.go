@@ -259,6 +259,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 						Name:     ac,
 						Alias:    aliasWithFun,
 						Function: aggrQuery.Type,
+						Coalesce: true,
 					})
 				}
 				for _, c := range s.Fields {

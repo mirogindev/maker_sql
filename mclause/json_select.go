@@ -12,6 +12,7 @@ type Column struct {
 	Name     string
 	Alias    string
 	Function string
+	Coalesce bool
 }
 
 type Select struct {
@@ -84,9 +85,16 @@ func (s Select) Build(builder clause.Builder) {
 			}
 
 			if column.Function != "" {
-				builder.WriteString(fmt.Sprintf(" %s(", column.Function))
+				closeSym := ")"
+				if column.Coalesce {
+					builder.WriteString(fmt.Sprintf(" COALESCE(%s(", column.Function))
+					closeSym = "),0)"
+				} else {
+					builder.WriteString(fmt.Sprintf(" %s(", column.Function))
+				}
+
 				builder.WriteQuoted(gc)
-				builder.WriteString(fmt.Sprintf(") AS \"%s\"", alias))
+				builder.WriteString(fmt.Sprintf("%s AS \"%s\"", closeSym, alias))
 			} else {
 				builder.WriteQuoted(gc)
 			}
