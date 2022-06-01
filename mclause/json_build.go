@@ -238,7 +238,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 				selectClauses := statement.Clauses["SELECT"]
 				selectExpression := selectClauses.Expression.(*Select)
 				groupByClause := gstm.Clauses["GROUP BY"]
-				groupByColumns := make([]clauses.Column, len(aggrQuery.Fields)-1)
+				groupByColumns := make([]clauses.Column, 0, len(aggrQuery.Fields))
 
 				builder.WriteString("json_build_object(")
 				for i, ac := range aggrQuery.Fields {

@@ -48,7 +48,8 @@ type UserAggregate struct {
 }
 
 type UserAggregateSum struct {
-	AggrVal *int `json:"aggr_val"`
+	AggrVal  *int `json:"aggr_val"`
+	AggrVal2 *int `json:"aggr_val2"`
 }
 
 type TagAggregateSum struct {
@@ -70,6 +71,7 @@ type User struct {
 	TagsAggregate []*TagAggregate `json:"tags_aggregate" gorm:"-" sql_gen:"Tags"`
 	Items         []*Item         `json:"items" gorm:"foreignKey:UserId"`
 	AggrVal       int             `json:"aggr_val"`
+	AggrVal2      int             `json:"aggr_val2"`
 	GroupID       *int64          `json:"group_id" mapstructure:"group_id" graphql:"group_id"`
 	Group         *UserGroup      `json:"group" mapstructure:"group" gorm:"foreignKey:GroupID"`
 	IsAdmin       *bool           `json:"is_admin" mapstructure:"is_admin" graphql:"is_admin"`
@@ -101,6 +103,7 @@ type Tag struct {
 	Name       *string      `json:"name"`
 	AggrName   *string      `json:"aggr_name"`
 	AggrVal    *int         `json:"aggr_val"`
+	AggrVal2   *int         `json:"aggr_vav2"`
 	Users      []*User      `json:"users"  gorm:"many2many:user_tag"`
 	Items      []*Item      `json:"items"  gorm:"many2many:tag_items"`
 	InnerItems []*InnerItem `gorm:"many2many:tag_inner_items"`
