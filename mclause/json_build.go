@@ -292,7 +292,9 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 				groupByClause.Expression = clauses.GroupBy{
 					Columns: groupByColumns,
 				}
-				gstm.Clauses["GROUP BY"] = groupByClause
+				if len(groupByColumns) > 0 {
+					gstm.Clauses["GROUP BY"] = groupByClause
+				}
 
 				builder.WriteByte(')')
 

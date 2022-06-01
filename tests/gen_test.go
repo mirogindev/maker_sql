@@ -456,6 +456,23 @@ func TestSumAggregationWithHasMany(t *testing.T) {
 	assert.Equal(t, *users[1].Sum.AggrVal, 20)
 }
 
+func TestSumAggregationWithoutExtraFields(t *testing.T) {
+	var users []*models.UserAggregate
+	Prepare()
+
+	err := DB.Model(&models.User{}).Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "sum", AggrQuery: &mclause.AggrQuery{Type: mclause.Sum, Fields: []string{"aggr_val"}}},
+		}}).Find(&users).Error
+
+	if err != nil {
+		panic(err)
+	}
+
+	assert.Len(t, users, 1)
+	assert.Equal(t, *users[0].Sum.AggrVal, 50)
+}
+
 func TestSumAggregationWithManyToMany(t *testing.T) {
 	var users []*models.UserAggregate
 	Prepare()
