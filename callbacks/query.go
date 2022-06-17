@@ -402,6 +402,11 @@ func preprocessWhereClause(exprs []clause.Expression, tableAlias string, level i
 		if ce, ok := v.(clause.Expr); ok {
 			ce.SQL, join = replaceTableNamesWIthLevel(ce.SQL, tableAlias, level)
 			exprs[i] = ce
+		} else if ce, ok := v.(clause.Eq); ok {
+			col := ce.Column.(clause.Column)
+			col.Table = tableAlias
+			ce.Column = col
+			exprs[i] = ce
 		} else if ne, ok := v.(clause.NamedExpr); ok {
 			ne.SQL, join = replaceTableNamesWIthLevel(ne.SQL, tableAlias, level)
 			exprs[i] = ne

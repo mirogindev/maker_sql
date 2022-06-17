@@ -81,6 +81,9 @@ func Prepare() {
 	status3 := "Status3"
 	status4 := "Status4"
 
+	uId1 := int64(1)
+	uId2 := int64(2)
+
 	uName1 := "User1"
 	uName2 := "User2"
 	uIsAdmin1 := true
@@ -166,9 +169,53 @@ func Prepare() {
 	DB.Create(ug1)
 	DB.Create(ug2)
 
-	DB.Create(&models.User{Name: &uName1, AggrVal: 20, AggrVal2: tAggVal11, IsAdmin: &uIsAdmin1, GroupID: ug1.ID, Tags: []*models.Tag{tag1, tag2}, Items: []*models.Item{item1, item2}})
-	DB.Create(&models.User{Name: &uName2, AggrVal: 30, AggrVal2: tAggVal22, IsAdmin: &uIsAdmin2, GroupID: ug2.ID, Tags: []*models.Tag{tag1, tag3}, Items: []*models.Item{item3, item4}})
+	DB.Create(&models.User{ID: &uId1, Name: &uName1, AggrVal: 20, AggrVal2: tAggVal11, IsAdmin: &uIsAdmin1, GroupID: ug1.ID, Tags: []*models.Tag{tag1, tag2}, Items: []*models.Item{item1, item2}})
+	DB.Create(&models.User{ID: &uId2, Name: &uName2, AggrVal: 30, AggrVal2: tAggVal22, IsAdmin: &uIsAdmin2, GroupID: ug2.ID, Tags: []*models.Tag{tag1, tag3}, Items: []*models.Item{item3, item4}})
 
+}
+
+func TestGetByIdQuery(t *testing.T) {
+	var queryStruct = struct {
+		ID int64 `json:"id"`
+	}{
+		ID: int64(1),
+	}
+	var user *models.User
+	Prepare()
+
+	err := DB.Debug().Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "id"},
+			{Name: "name"},
+		}}).Where(queryStruct).Take(&user).Error
+	if err != nil {
+		panic(err)
+	}
+	assert.Empty(t, err)
+	assert.NotEmpty(t, user)
+}
+
+func TestGetByTwoFieldsQuery(t *testing.T) {
+	var queryStruct = struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+	}{
+		ID:   int64(1),
+		Name: "User1",
+	}
+	var user *models.User
+	Prepare()
+
+	err := DB.Debug().Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "id"},
+			{Name: "name"},
+		}}).Where(queryStruct).Take(&user).Error
+	if err != nil {
+		panic(err)
+	}
+	assert.Empty(t, err)
+	assert.NotEmpty(t, user)
 }
 
 func TestSimpleQuery(t *testing.T) {
