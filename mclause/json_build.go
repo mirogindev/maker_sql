@@ -300,7 +300,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 				builder.WriteByte(')')
 
 			} else {
-				f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(column.Name)]
+				f := gstm.Schema.FieldsByDBName[column.Name]
 				alias := fmt.Sprintf("%s%v_%s", baseTable, s.Level, f.DBName)
 				builder.WriteString(alias)
 			}
