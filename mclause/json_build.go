@@ -111,8 +111,8 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 			}
 
 			builder.WriteString(fmt.Sprintf("'%s'", column.Name))
-
 			builder.WriteByte(',')
+
 			if column.Query != nil {
 				f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(column.Name)]
 
@@ -267,7 +267,8 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 						if c.Query != nil {
 							fr := gstm.Schema.Relationships.Relations[strcase.ToCamel(c.Name)]
 							if fr == nil {
-								logrus.Panicf("Reference field %s is not found", c.Name)
+								logrus.Errorf("reference field %s is not found", c.Name)
+								continue
 							}
 
 							for _, l := range fr.References {
@@ -303,6 +304,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 				f := gstm.Schema.FieldsByDBName[column.Name]
 				if f == nil {
 					logrus.Errorf("db field with name %s not found \n", column.Name)
+					builder.WriteString("'field not found'")
 					continue
 				}
 				alias := fmt.Sprintf("%s%v_%s", baseTable, s.Level, f.DBName)

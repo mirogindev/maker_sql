@@ -234,6 +234,23 @@ func TestSimpleQuery(t *testing.T) {
 	assert.Len(t, users, 2)
 }
 
+func TestSimpleQueryWithNoExistFieldShouldIgnored(t *testing.T) {
+	var users []*models.User
+	Prepare()
+
+	err := DB.Debug().Clauses(mclause.JsonBuild{
+		Fields: []mclause.Field{
+			{Name: "id"},
+			{Name: "name"},
+			{Name: "_typename"},
+		}}).Find(&users).Error
+	if err != nil {
+		panic(err)
+	}
+	assert.NotEmpty(t, users)
+	assert.Len(t, users, 2)
+}
+
 func TestSimpleQueryWithBooleanFilter(t *testing.T) {
 	var users []*models.User
 	Prepare()
