@@ -301,6 +301,10 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 			} else {
 				f := gstm.Schema.FieldsByDBName[column.Name]
+				if f == nil {
+					logrus.Errorf("db field with name %s not found \n", column.Name)
+					continue
+				}
 				alias := fmt.Sprintf("%s%v_%s", baseTable, s.Level, f.DBName)
 				builder.WriteString(alias)
 			}
