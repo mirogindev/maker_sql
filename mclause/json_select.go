@@ -64,7 +64,8 @@ func (s Select) Build(builder clause.Builder) {
 		for idx, column := range s.Columns {
 			f := gstm.Schema.FieldsByDBName[column.Name]
 			if f == nil {
-				logrus.Panicf("Field %s not found in db", column.Name)
+				logrus.Errorf("db field with name %s not found \n", column.Name)
+				continue
 			}
 
 			alias := column.Alias
