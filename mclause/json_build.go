@@ -309,7 +309,13 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 				builder.WriteByte(')')
 
 			} else {
-				f := gstm.Schema.FieldsByDBName[column.Name]
+				var f *schema.Field
+				if column.Name == "~~~py~~~" {
+					f = gstm.Schema.PrimaryFields[0]
+				} else {
+					f = gstm.Schema.FieldsByDBName[column.Name]
+				}
+
 				if f == nil {
 					logrus.Errorf("db field with name %s not found \n", column.Name)
 					builder.WriteString("'field not found'")

@@ -186,7 +186,7 @@ func TestGetByIdQuery(t *testing.T) {
 	tagsQuery := DB.Clauses(mclause.JsonBuild{
 		AsList: true,
 		Fields: []mclause.Field{
-			{Name: "id"},
+			{Name: "~~~py~~~"},
 		}})
 
 	err := DB.Debug().Clauses(mclause.JsonBuild{

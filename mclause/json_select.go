@@ -5,6 +5,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/schema"
 	"strings"
 )
 
@@ -62,7 +63,12 @@ func (s Select) Build(builder clause.Builder) {
 		}
 
 		for idx, column := range s.Columns {
-			f := gstm.Schema.FieldsByDBName[column.Name]
+			var f *schema.Field
+			if column.Name == "~~~py~~~" {
+				f = gstm.Schema.PrimaryFields[0]
+			} else {
+				f = gstm.Schema.FieldsByDBName[column.Name]
+			}
 			if f == nil {
 				logrus.Errorf("db field with name %s not found \n", column.Name)
 				continue
