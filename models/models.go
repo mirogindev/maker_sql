@@ -67,6 +67,7 @@ type User struct {
 	CreatedAt     time.Time       `json:"created_at" mapstructure:"created_at"`
 	UpdatedAt     time.Time       `json:"updated_at" mapstructure:"updated_at"`
 	Name          *string         `json:"name" mapstructure:"name"`
+	TagsIds       []*int64        `json:"tags_ids" gorm:"-" sql_gen:"Tags"`
 	Tags          []*Tag          `json:"tags" gorm:"many2many:user_tag"`
 	TagsAggregate []*TagAggregate `json:"tags_aggregate" gorm:"-" sql_gen:"Tags"`
 	Items         []*Item         `json:"items" gorm:"foreignKey:UserId"`

@@ -183,16 +183,24 @@ func TestGetByIdQuery(t *testing.T) {
 	var user *models.User
 	Prepare()
 
+	tagsQuery := DB.Clauses(mclause.JsonBuild{
+		AsList: true,
+		Fields: []mclause.Field{
+			{Name: "id"},
+		}})
+
 	err := DB.Debug().Clauses(mclause.JsonBuild{
 		Fields: []mclause.Field{
 			{Name: "id"},
 			{Name: "name"},
+			{Name: "tags_ids", Query: tagsQuery},
 		}}).Where(queryStruct).Take(&user).Error
 	if err != nil {
 		panic(err)
 	}
 	assert.Empty(t, err)
 	assert.NotEmpty(t, user)
+	assert.Len(t, user.TagsIds, 2)
 }
 
 func TestGetByTwoFieldsQuery(t *testing.T) {

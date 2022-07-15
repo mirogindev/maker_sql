@@ -36,6 +36,7 @@ type Field struct {
 }
 
 type JsonBuild struct {
+	AsList         bool
 	BaseTable      string
 	BaseTableAlias string
 	Level          int
@@ -91,13 +92,19 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 		s.GenerateFieldJoins(gstm)
 	}
 
-	if s.JsonAgg {
+	if s.AsList {
+		builder.WriteString("SELECT json_agg(")
+	} else if s.JsonAgg {
 		builder.WriteString("SELECT json_agg(json_build_object(")
 	} else {
 		builder.WriteString("SELECT json_build_object(")
 	}
 	baseTable := s.BaseTable
 	baseTableAlias := s.BaseTableAlias
+
+	if s.AsList && len(s.Fields) != 0 {
+		logrus.Errorf("as list query should have the only one field")
+	}
 
 	if len(s.Fields) > 0 {
 
@@ -109,9 +116,10 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 			} else {
 				builder.WriteByte('\n')
 			}
-
-			builder.WriteString(fmt.Sprintf("'%s'", column.Name))
-			builder.WriteByte(',')
+			if !s.AsList {
+				builder.WriteString(fmt.Sprintf("'%s'", column.Name))
+				builder.WriteByte(',')
+			}
 
 			if column.Query != nil {
 				f := gstm.Schema.FieldsByName[sqlgenerator.ToCamelCase(column.Name)]
@@ -315,7 +323,7 @@ func (s JsonBuild) Build(builder clauses.Builder) {
 
 		builder.WriteByte(')')
 
-		if s.JsonAgg {
+		if s.JsonAgg && !s.AsList {
 			builder.WriteByte(')')
 		}
 		builder.WriteString(" FROM ( ")
